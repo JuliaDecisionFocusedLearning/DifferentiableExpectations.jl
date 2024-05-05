@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   test:
-    name: Test - Julia ${{ matrix.version }}
+    name: Test - Julia ${{ matrix.julia-version }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
