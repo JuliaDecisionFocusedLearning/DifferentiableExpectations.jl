@@ -2,7 +2,9 @@
 
 This package revolves around functions defined as expectations:
 
-$$F(\theta) = \mathbb{E}_{p_\theta}[f(X)]$$
+```math
+F(\theta) = \mathbb{E}_{p_\theta}[f(X)]
+```
 
 It allows the computation of derivatives with respect to $\theta$, and their approximation with Monte-Carlo samples.
 
