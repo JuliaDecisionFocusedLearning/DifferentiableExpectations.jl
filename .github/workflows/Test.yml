@@ -1,4 +1,4 @@
-name: Run tests
+name: Tests
 
 on:
   push:
@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   test:
+    name: Test - Julia ${{ matrix.version }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -37,4 +38,4 @@ jobs:
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          fail_ci_if_error: false

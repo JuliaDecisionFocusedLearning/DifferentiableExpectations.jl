@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   build:
+    name: "Documentation"
     permissions:
       contents: write
       pull-requests: read
