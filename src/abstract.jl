@@ -1,52 +1,69 @@
 """
-    AbstractExpectation{threaded}
+    DifferentiableExpectation{threaded,D}
 
-Abstract supertype for expectation wrappers.
+Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`, whose value and derivative are approximated with Monte-Carlo averages.
 
-The type parameter `threaded` is a `Bool` stating whether the Monte-Carlo samples should be computed in parallel.
+# Type parameters
+
+- `threaded::Bool`: specifies whether the sampling should be performed in parallel (with OhMyThreads.jl)
+- `D::Type`: the type of the probability distribution, such that calling `D(θ...)` generates a sampleable object corresponding to `p(θ)`
+
+# Required fields
+
+- `f`: the function applied inside the expectation
+- `rng`: the random number generator
+- `nb_samples`: the number of Monte-Carlo samples
 """
-abstract type AbstractExpectation{threaded} end
+abstract type DifferentiableExpectation{threaded,D} end
 
-"""
-    distribution(e::AbstractExpectation, θ...)
-
-Build the sampling distribution for `e` based on parameters `\theta`.
-"""
-function distribution end
-
-"""
-    (e::AbstractExpectation)(θ...)
-
-Return the Monte-Carlo average of the function represented by `e` over several samples of `distribution(e, θ...)`.
-"""
-function (e::AbstractExpectation{threaded})(θ...) where {threaded}
-    dist = distribution(e, θ...)
-    s = if threaded
-        tmapreduce(+, 1:(e.nb_samples)) do _
-            e.f(rand(e.rng, dist))
-        end
-    else
-        mapreduce(+, 1:(e.nb_samples)) do _
-            e.f(rand(e.rng, dist))
-        end
-    end
-    return s / e.nb_samples
+function distribution(::DifferentiableExpectation{threaded,D}, θ...) where {threaded,D}
+    return D(θ...)
 end
 
 """
-    samples(e::AbstractExpectation, θ...)
+    (F::DifferentiableExpectation)(θ...)
 
-Return the values of the function represented by `e` for several samples of `distribution(e, θ...)`.
+Return a Monte-Carlo average `(1/s) ∑f(xᵢ)` where the `xᵢ ∼ p(θ)` are iid samples.
 """
-function samples(e::AbstractExpectation{threaded}, θ...) where {threaded}
-    dist = distribution(e, θ...)
-    if threaded
-        return tmap(1:(e.nb_samples)) do _
-            e.f(rand(e.rng, dist))
-        end
+function (F::DifferentiableExpectation{threaded})(θ...) where {threaded}
+    dist = distribution(F, θ...)
+    _sample(_) = F.f(rand(F.rng, dist))
+    y = if threaded
+        tmapmean(_sample, 1:(F.nb_samples))
     else
-        return map(1:(e.nb_samples)) do _
-            e.f(rand(e.rng, dist))
-        end
+        mean(_sample, 1:(F.nb_samples))
     end
+    return y
+end
+
+"""
+    pre_samples(F::DifferentiableExpectation, θ...)
+
+Return a vector `[x₁, ..., xₛ]` where the `xᵢ ∼ p(θ)` are iid samples.
+"""
+function pre_samples(F::DifferentiableExpectation{threaded}, θ...) where {threaded}
+    dist = distribution(F, θ...)
+    _pre_sample(_) = rand(F.rng, dist)
+    xs = if threaded
+        tmap(_pre_sample, 1:(F.nb_samples))
+    else
+        map(_pre_sample, 1:(F.nb_samples))
+    end
+    return xs
+end
+
+"""
+    samples(F::DifferentiableExpectation, θ...)
+
+Return a vector `[f(x₁), ..., f(xₛ)]` where the `xᵢ ∼ p(θ)` are iid samples.
+"""
+function samples(F::DifferentiableExpectation{threaded}, θ...) where {threaded}
+    dist = distribution(F, θ...)
+    _sample(_) = F.f(rand(F.rng, dist))
+    ys = if threaded
+        map(_sample, 1:(F.nb_samples))  # TODO: tmap fails here
+    else
+        map(_sample, 1:(F.nb_samples))
+    end
+    return ys
 end

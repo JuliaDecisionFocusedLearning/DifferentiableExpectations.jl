@@ -4,6 +4,7 @@ using JET: JET
 using JuliaFormatter: JuliaFormatter
 using DifferentiableExpectations
 using Test
+using Zygote
 
 @testset verbose = true "DifferentiableExpectations" begin
     @testset verbose = true "Formalities" begin
