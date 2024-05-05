@@ -16,6 +16,11 @@ Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(
 """
 abstract type DifferentiableExpectation{threaded,D} end
 
+"""
+    distribution(F::DifferentiableExpectation, θ...)
+
+Create a sampleable object `p(θ)`.
+"""
 function distribution(::DifferentiableExpectation{threaded,D}, θ...) where {threaded,D}
     return D(θ...)
 end

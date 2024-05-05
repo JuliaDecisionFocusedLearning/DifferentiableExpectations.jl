@@ -32,7 +32,7 @@ include("reparametrization.jl")
 include("pushforward.jl")
 
 export DifferentiableExpectation
-export samples
+export samples, distribution
 export REINFORCE
 
 end # module DifferentiableExpectations
