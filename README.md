@@ -17,3 +17,5 @@ The following estimators are implemented:
 
   - [REINFORCE](https://jmlr.org/papers/volume21/19-346/19-346.pdf#section.20)
   - [Reparametrization](https://jmlr.org/papers/volume21/19-346/19-346.pdf#section.56)
+
+> Warning: this package is experimental, use at your own risk and expect frequent breaking releases.

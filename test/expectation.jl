@@ -11,6 +11,8 @@ using Zygote
 exp_with_kwargs(x; correct=false) = correct ? exp(x) : sin(x)
 vec_exp_with_kwargs(x; correct=false) = exp_with_kwargs.(x; correct)
 
+normal_logdensity_grad(x, θ...) = gradient((_θ...) -> logpdf(Normal(_θ...), x), θ...)
+
 μ, σ = 0.5, 1.0
 true_mean(μ, σ) = mean(LogNormal(μ, σ))
 true_std(μ, σ) = std(LogNormal(μ, σ))
@@ -22,6 +24,14 @@ true_std(μ, σ) = std(LogNormal(μ, σ))
             Reinforce(
                 exp_with_kwargs,
                 Normal;
+                rng=StableRNG(63),
+                nb_samples=10^4,
+                threaded=threaded,
+            ),
+            Reinforce(
+                exp_with_kwargs,
+                Normal,
+                normal_logdensity_grad;
                 rng=StableRNG(63),
                 nb_samples=10^4,
                 threaded=threaded,
