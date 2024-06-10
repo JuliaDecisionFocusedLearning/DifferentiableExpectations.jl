@@ -9,15 +9,15 @@ Whenever its expectation is differentiated, only the weights are considered acti
 
 $(TYPEDFIELDS)
 """
-struct FixedAtomsProbabilityDistribution{threaded,A,W}
+struct FixedAtomsProbabilityDistribution{threaded,A,W<:Real}
     atoms::Vector{A}
     weights::Vector{W}
 
     function FixedAtomsProbabilityDistribution(
         atoms::Vector{A}, weights::Vector{W}; threaded::Bool=false
     ) where {A,W}
-        if isempty(atoms)
-            throw(ArgumentError("`atoms` must be non-empty."))
+        if isempty(atoms) || isempty(weights)
+            throw(ArgumentError("`atoms` and `weights` must be non-empty."))
         elseif length(atoms) != length(weights)
             throw(DimensionMismatch("`atoms` and `weights` must have the same length."))
         elseif !isapprox(sum(weights), one(W); atol=1e-4)
