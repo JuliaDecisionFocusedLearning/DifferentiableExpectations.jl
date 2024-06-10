@@ -18,7 +18,7 @@ using ChainRulesCore:
     rrule_via_ad,
     unthunk
 using DensityInterface: logdensityof
-using Distributions: Distribution
+using Distributions: Distribution, gradlogpdf
 using DocStringExtensions
 using LinearAlgebra: dot
 using OhMyThreads: tmap, treduce, tmapreduce
@@ -32,7 +32,6 @@ include("reparametrization.jl")
 include("pushforward.jl")
 
 export DifferentiableExpectation
-export samples, distribution
 export REINFORCE
 
 end # module DifferentiableExpectations
