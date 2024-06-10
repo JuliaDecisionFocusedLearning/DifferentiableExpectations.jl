@@ -15,7 +15,7 @@ Most of the math below is taken from [mohamedMonteCarloGradient2020](@citet).
 
 ## REINFORCE
 
-### Basics
+### Principle
 
 The REINFORCE estimator is derived with the help of the identity ``\nabla \log u = \nabla u / u``:
 
@@ -45,12 +45,11 @@ And the vector-Jacobian product:
 ### Variance reduction
 
 !!! warning
-    
     Work in progress.
 
 ## Reparametrization
 
-### Basics
+### Trick
 
 The reparametrization trick assumes that we can rewrite the random variable ``X \sim p(\theta)`` as ``X = g(Z, \theta)``, where ``Z \sim q`` is another random variable whose distribution does not depend on ``\theta``.
 
@@ -80,7 +79,8 @@ And the vector-Jacobian product:
 
 The following reparametrizations are implemented:
 
-  - Univariate Gaussian: ``X \sim \mathcal{N}(\mu, \sigma^2)`` is equivalent to ``X = \mu + \sigma Z`` with ``Z \sim \mathcal{N}(0, 1)``.
+- Univariate Normal: ``X \sim \mathcal{N}(\mu, \sigma^2)`` is equivalent to ``X = \mu + \sigma Z`` with ``Z \sim \mathcal{N}(0, 1)``.
+- Multivariate Normal: ``X \sim \mathcal{N}(\mu, \Sigma)`` is equivalent to ``X = \mu + L Z`` with ``Z \sim \mathcal{N}(0, I)`` and ``L L^\top = \Sigma``. The matrix ``L`` can be obtained by Cholesky decomposition of ``\Sigma``.
 
 ## Bibliography
 

@@ -41,7 +41,7 @@ Return a vector `[x₁, ..., xₛ]` or matrix `[x₁ ... xₛ]` where the `xᵢ 
 function presamples(F::DifferentiableExpectation, θ...)
     (; dist_constructor, rng, nb_samples) = F
     dist = dist_constructor(θ...)
-    xs = rand(rng, dist, nb_samples)  # TODO: parallelize?
+    xs = maybe_eachcol(rand(rng, dist, nb_samples))
     return xs
 end
 
@@ -64,18 +64,6 @@ function samples_from_presamples(
         return tmap(fk, xs)
     else
         return map(fk, xs)
-    end
-end
-
-function samples_from_presamples(
-    F::DifferentiableExpectation{threaded}, xs::AbstractMatrix; kwargs...
-) where {threaded}
-    (; f) = F
-    fk = FixKwargs(f, kwargs)
-    if threaded
-        return tmap(fk, eachcol(xs))
-    else
-        return map(fk, eachcol(xs))
     end
 end
 

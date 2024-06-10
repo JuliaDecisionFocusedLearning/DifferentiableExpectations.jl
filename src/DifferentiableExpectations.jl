@@ -20,12 +20,12 @@ using ChainRulesCore:
     rrule_via_ad,
     unthunk
 using DensityInterface: logdensityof
-using Distributions: Distribution, Normal
+using Distributions: Distribution, MvNormal, Normal
 using DocStringExtensions
-using LinearAlgebra: dot
+using LinearAlgebra: Diagonal, cholesky, dot
 using OhMyThreads: tmap, treduce, tmapreduce
 using Random: Random, AbstractRNG, default_rng
-using Statistics: Statistics, mean, std
+using Statistics: Statistics, cov, mean, std
 using StatsBase: StatsBase
 
 include("utils.jl")

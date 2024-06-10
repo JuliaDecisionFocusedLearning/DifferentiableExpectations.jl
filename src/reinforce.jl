@@ -90,36 +90,6 @@ function dist_logdensity_grad(
     return dθ
 end
 
-function logdensity_grads_from_presamples(
-    rc::RuleConfig,
-    F::DifferentiableExpectation{threaded},
-    xs::AbstractVector,
-    θ...;
-    kwargs...,
-) where {threaded}
-    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
-    if threaded
-        return tmap(_dist_logdensity_grad_partial, xs)
-    else
-        return map(_dist_logdensity_grad_partial, xs)
-    end
-end
-
-function logdensity_grads_from_presamples(
-    rc::RuleConfig,
-    F::DifferentiableExpectation{threaded},
-    xs::AbstractMatrix,
-    θ...;
-    kwargs...,
-) where {threaded}
-    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
-    if threaded
-        return tmap(_dist_logdensity_grad_partial, eachcol(xs))
-    else
-        return map(_dist_logdensity_grad_partial, eachcol(xs))
-    end
-end
-
 function ChainRulesCore.rrule(
     rc::RuleConfig, F::Reinforce{threaded}, θ...; kwargs...
 ) where {threaded}
@@ -129,7 +99,12 @@ function ChainRulesCore.rrule(
     xs = presamples(F, θ...)
     ys = samples_from_presamples(F, xs; kwargs...)
 
-    gs = logdensity_grads_from_presamples(rc, F, xs, θ...)
+    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
+    gs = if threaded
+        tmap(_dist_logdensity_grad_partial, xs)
+    else
+        map(_dist_logdensity_grad_partial, xs)
+    end
 
     function pullback_Reinforce(dy_thunked)
         dy = unthunk(dy_thunked)

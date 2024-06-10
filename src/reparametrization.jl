@@ -39,6 +39,15 @@ function reparametrize(dist::Normal{T}) where {T}
     return TransformedDistribution(base_dist, transformation)
 end
 
+function reparametrize(dist::MvNormal{T}) where {T}
+    n = length(dist)
+    base_dist = MvNormal(fill(zero(T), n), Diagonal(fill(one(T), n)))
+    μ, Σ = mean(dist), cov(dist)
+    C = cholesky(Σ)
+    transformation(z) = μ .+ C.L * z
+    return TransformedDistribution(base_dist, transformation)
+end
+
 """
     Reparametrization{threaded} <: DifferentiableExpectation{threaded}
 
@@ -114,8 +123,12 @@ function ChainRulesCore.rrule(
     (; f, dist_constructor, rng, nb_samples) = F
     dist = dist_constructor(θ...)
     transformed_dist = reparametrize(dist)
-    zs = rand(rng, transformed_dist.base_dist, nb_samples)
-    xs = transformed_dist.transformation.(zs)
+    zs = maybe_eachcol(rand(rng, transformed_dist.base_dist, nb_samples))
+    xs = if threaded
+        tmap(transformed_dist.transformation, zs)
+    else
+        map(transformed_dist.transformation, zs)
+    end
     ys = samples_from_presamples(F, xs; kwargs...)
 
     function h(z, θ)

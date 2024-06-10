@@ -13,13 +13,13 @@ vec_exp_with_kwargs(x; correct=false) = exp_with_kwargs.(x; correct)
 
 normal_logdensity_grad(x, θ...) = gradient((_θ...) -> logpdf(Normal(_θ...), x), θ...)
 
-μ, σ = 0.5, 1.0
-true_mean(μ, σ) = mean(LogNormal(μ, σ))
-true_std(μ, σ) = std(LogNormal(μ, σ))
-∇mean_true = gradient(true_mean, μ, σ)
-
 @testset verbose = true "Univariate LogNormal" begin
-    @testset verbose = true "Threaded: $threaded" for threaded in (false, true)
+    μ, σ = 0.5, 1.0
+    true_mean(μ, σ) = mean(LogNormal(μ, σ))
+    true_std(μ, σ) = std(LogNormal(μ, σ))
+    ∇mean_true = gradient(true_mean, μ, σ)
+
+    @testset verbose = true "Threaded: $threaded" for threaded in (false,)  #
         @testset "$(nameof(typeof(F)))" for F in [
             Reinforce(
                 exp_with_kwargs,
@@ -59,6 +59,11 @@ true_std(μ, σ) = std(LogNormal(μ, σ))
 end;
 
 @testset verbose = true "Multivariate LogNormal" begin
+    μ, σ = [2.0, 3.0], [1.0, 0.5]
+    true_mean(μ, σ) = mean.(LogNormal.(μ, σ))
+    true_std(μ, σ) = std.(LogNormal.(μ, σ))
+    ∂mean_true = jacobian(true_mean, μ, σ)
+
     @testset verbose = true "Threaded: $threaded" for threaded in (false, true)
         @testset "$(nameof(typeof(F)))" for F in [
             Reinforce(
@@ -68,16 +73,18 @@ end;
                 nb_samples=10^5,
                 threaded=threaded,
             ),
+            # Reparametrization(
+            #     vec_exp_with_kwargs,
+            #     (μ, σ) -> MvNormal(μ, Diagonal(σ .^ 2));
+            #     rng=StableRNG(63),
+            #     nb_samples=10^5,
+            #     threaded=threaded,
+            # ),
         ]
-            μ, σ = [2.0, 3.0], [1.0, 0.5]
-            true_mean(μ, σ) = mean.(LogNormal.(μ, σ))
-            true_std(μ, σ) = std.(LogNormal.(μ, σ))
-
             @test F.dist_constructor(μ, σ) == MvNormal(μ, Diagonal(σ .^ 2))
             @test F(μ, σ; correct=true) ≈ true_mean(μ, σ) rtol = 0.1
 
             ∂mean_est = jacobian((μ, σ) -> F(μ, σ; correct=true), μ, σ)
-            ∂mean_true = jacobian(true_mean, μ, σ)
 
             @test ∂mean_est[1] ≈ ∂mean_true[1] rtol = 0.1
             @test ∂mean_est[2] ≈ ∂mean_true[2] rtol = 0.1

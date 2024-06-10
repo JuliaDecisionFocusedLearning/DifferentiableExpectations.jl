@@ -10,3 +10,6 @@ end
 function tmean(args...)
     return treduce(+, args...) / length(first(args))
 end
+
+maybe_eachcol(x::AbstractVector) = x
+maybe_eachcol(x::AbstractMatrix) = eachcol(x)
