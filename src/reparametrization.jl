@@ -15,6 +15,16 @@ struct TransformedDistribution{D,T}
 end
 
 """
+    rand(rng, dist::TransformedDistribution)
+
+Sample from `dist` by applying `dist.transformation` to `dist.base_dist`.
+"""
+function Random.rand(rng::AbstractRNG, dist::TransformedDistribution)
+    (; base_dist, transformation) = dist
+    return transformation(rand(rng, base_dist))
+end
+
+"""
     reparametrize(dist)
 
 Turn a probability distribution `p` into a [`TransformedDistribution`](@ref) `(q, T)` such that the new distribution `q` does not depend on the parameters of `p`.
@@ -42,7 +52,7 @@ Differentiable parametric expectation `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`
 ```jldoctest
 using DifferentiableExpectations, Distributions, Zygote
 
-F = Reparametrization(exp, Normal; nb_samples=10^3)
+F = Reparametrization(exp, Normal; nb_samples=10^4)
 F_true(μ, σ) = mean(LogNormal(μ, σ))
 
 μ, σ = 0.5, 1,0

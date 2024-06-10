@@ -3,6 +3,17 @@
 
 Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`, whose value and derivative are approximated with Monte-Carlo averages.
 
+# Subtypes
+
+  - [`Reinforce`](@ref)
+  - [`Reparametrization`](@ref)
+
+# Calling behavior
+
+    (F::DifferentiableExpectation)(θ...; kwargs...)
+
+Return a Monte-Carlo average `(1/s) ∑f(xᵢ)` where the `xᵢ ∼ p(θ)` are iid samples.
+
 # Type parameters
 
   - `threaded::Bool`: specifies whether the sampling should be performed in parallel
@@ -68,11 +79,6 @@ function samples_from_presamples(
     end
 end
 
-"""
-    (F::DifferentiableExpectation)(θ...; kwargs...)
-
-Return a Monte-Carlo average `(1/s) ∑f(xᵢ)` where the `xᵢ ∼ p(θ)` are iid samples.
-"""
 function (F::DifferentiableExpectation{threaded})(θ...; kwargs...) where {threaded}
     ys = samples(F, θ...; kwargs...)
     y = if threaded

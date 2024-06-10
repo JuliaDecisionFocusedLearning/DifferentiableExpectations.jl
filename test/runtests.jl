@@ -27,10 +27,13 @@ using Zygote
             Documenter.doctest(DifferentiableExpectations)
         end
     end
-    @testset verbose = true "Expectation" begin
-        include("expectation.jl")
-    end
     @testset "Distribution" begin
         include("distribution.jl")
+    end
+    @testset verbose = true "Reparametrization" begin
+        include("reparametrization.jl")
+    end
+    @testset verbose = true "Expectation" begin
+        include("expectation.jl")
     end
 end

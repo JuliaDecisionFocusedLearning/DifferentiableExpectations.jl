@@ -48,8 +48,8 @@ true_std(μ, σ) = std(LogNormal(μ, σ))
     end
 end;
 
-@testset "Multivariate LogNormal" begin
-    @testset "Threaded: $threaded" for threaded in (false, true)
+@testset verbose = true "Multivariate LogNormal" begin
+    @testset verbose = true "Threaded: $threaded" for threaded in (false, true)
         @testset "$(nameof(typeof(F)))" for F in [
             Reinforce(
                 vec_exp_with_kwargs,
