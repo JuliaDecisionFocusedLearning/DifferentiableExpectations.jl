@@ -1,0 +1,88 @@
+# Background
+
+Consider a function ``f: \mathbb{R}^n \to \mathbb{R}^m`` and a parametric probability distribution ``p(\theta)`` on the input space ``\mathbb{R}^n``.
+Given a random variable ``X \sim p(\theta)``, we want to differentiate the following expectation with respect to ``\theta``:
+
+```math
+F(\theta) = \mathbb{E}_{p(\theta)}[f(X)]
+```
+
+Since ``F`` is a vector-to-vector function, the key quantity we want to compute is its Jacobian matrix ``\partial F(\theta) \in \mathbb{R}^{m \times n}``.
+However, to implement automatic differentiation, we only need vector-Jacobian products (VJPs) ``\partial F(\theta)^\top v`` with ``v \in \mathbb{R}^m``, also called pullbacks.
+See the book by [blondelElementsDifferentiableProgramming2024](@citet) to know more.
+
+Most of the math below is taken from [mohamedMonteCarloGradient2020](@citet).
+
+## REINFORCE
+
+### Basics
+
+The REINFORCE estimator is derived with the help of the identity ``\nabla \log u = \nabla u / u``:
+
+```math
+\begin{aligned}
+F(\theta + \varepsilon)
+& = \int f(x) ~ p(x, \theta + \varepsilon) ~ \mathrm{d}x \\
+& \approx \int f(x) ~ \left(p(x, \theta) + \nabla_\theta p(x, \theta)^\top \varepsilon\right) ~ \mathrm{d}x \\
+& = \int f(x) ~ \left(p(x, \theta) + p(x, \theta) \nabla_\theta \log p(x, \theta)^\top \varepsilon\right) ~ \mathrm{d}x \\
+& = F(\theta) + \left(\int f(x) ~ p(x, \theta) \nabla_\theta \log p(x, \theta)^\top ~ \mathrm{d}x\right) \varepsilon \\
+& = F(\theta) + \mathbb{E}_{p(\theta)} \left[f(X) \nabla_\theta \log p(X, \theta)^\top\right] ~ \varepsilon \\
+\end{aligned}
+```
+
+We thus identify the Jacobian matrix:
+
+```math
+\partial F(\theta) = \mathbb{E}_{p(\theta)} \left[f(X) \nabla_\theta \log p(X, \theta)^\top\right]
+```
+
+And the vector-Jacobian product:
+
+```math
+\partial F(\theta)^\top v = \mathbb{E}_{p(\theta)} \left[(f(X)^\top v) \nabla_\theta \log p(X, \theta)\right]
+```
+
+### Variance reduction
+
+!!! warning
+    
+    Work in progress.
+
+## Reparametrization
+
+### Basics
+
+The reparametrization trick assumes that we can rewrite the random variable ``X \sim p(\theta)`` as ``X = g(Z, \theta)``, where ``Z \sim q`` is another random variable whose distribution does not depend on ``\theta``.
+
+```math
+\begin{aligned}
+F(\theta + \varepsilon)
+& = \int f(g(z, \theta + \varepsilon)) ~ q(z) ~ \mathrm{d}z \\
+& \approx \int f\left(g(z, \theta) + \partial_\theta g(z, \theta) ~ \varepsilon\right) ~ q(z) ~ \mathrm{d}z \\
+& \approx F(\theta) + \int \partial f(g(z, \theta)) ~ \partial_\theta g(z, \theta) ~ \varepsilon ~ q(z) ~ \mathrm{d}z \\
+& \approx F(\theta) + \mathbb{E}_q \left[ \partial f(g(Z, \theta)) ~ \partial_\theta g(Z, \theta) \right] ~ \varepsilon \\
+\end{aligned}
+```
+
+If we denote ``h(z, \theta) = f(g(z, \theta))``, then we identify the Jacobian matrix:
+
+```math
+\partial F(\theta) = \mathbb{E}_q \left[ \partial_\theta h(Z, \theta) \right]
+```
+
+And the vector-Jacobian product:
+
+```math
+\partial F(\theta)^\top v = \mathbb{E}_q \left[ \partial_\theta h(Z, \theta)^\top v \right]
+```
+
+### Catalogue
+
+The following reparametrizations are implemented:
+
+  - Univariate Gaussian: ``X \sim \mathcal{N}(\mu, \sigma^2)`` is equivalent to ``X = \mu + \sigma Z`` with ``Z \sim \mathcal{N}(0, 1)``.
+
+## Bibliography
+
+```@bibliography
+```

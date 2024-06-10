@@ -5,14 +5,16 @@ Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(
 
 # Type parameters
 
-  - `threaded::Bool`: specifies whether the sampling should be performed in parallel (with OhMyThreads.jl)
+  - `threaded::Bool`: specifies whether the sampling should be performed in parallel
 
 # Required fields
 
-  - `f`: the function applied inside the expectation
-  - `dist_constructor`: the constructor of the probability distribution, such that calling `D(θ...)` generates an object corresponding to `p(θ)`
-  - `rng`: the random number generator
-  - `nb_samples`: the number of Monte-Carlo samples
+  - `dist_constructor`: The constructor of the probability distribution, such that calling `dist_constructor(θ...)` generates an object corresponding to `p(θ)`. This object must satisfy:
+  - the [Random API](https://docs.julialang.org/en/v1/stdlib/Random/#Hooking-into-the-Random-API)
+  - the [DensityInterface.jl API](https://github.com/JuliaMath/DensityInterface.jl)
+  - `f`: The function applied inside the expectation.
+  - `rng::AbstractRNG`: The random number generator.
+  - `nb_samples::Integer`: The number of Monte-Carlo samples.
 """
 abstract type DifferentiableExpectation{threaded} end
 

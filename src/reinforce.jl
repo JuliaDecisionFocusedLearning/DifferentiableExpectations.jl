@@ -1,14 +1,14 @@
 """
-    REINFORCE{threaded} <: DifferentiableExpectation{threaded}
+    Reinforce{threaded} <: DifferentiableExpectation{threaded}
 
 Differentiable parametric expectation `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)` using the REINFORCE (or score function) gradient estimator:
 ```
-∂F(θ) = 𝔼[f(X) ∇₁logp(θ, x)ᵀ]
+∂F(θ) = 𝔼[f(X) ∇₂logp(X,θ)ᵀ]
 ```
 
 # Constructor
 
-    REINFORCE(
+    Reinforce(
         f,
         dist_constructor,
         dist_gradlogpdf=nothing;
@@ -25,7 +25,7 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct REINFORCE{threaded,F,D,G,R<:AbstractRNG} <: DifferentiableExpectation{threaded}
+struct Reinforce{threaded,F,D,G,R<:AbstractRNG} <: DifferentiableExpectation{threaded}
     f::F
     dist_constructor::D
     dist_logdensity_grad::G
@@ -33,7 +33,15 @@ struct REINFORCE{threaded,F,D,G,R<:AbstractRNG} <: DifferentiableExpectation{thr
     nb_samples::Int
 end
 
-function REINFORCE(
+function Base.show(io::IO, rep::Reinforce{threaded}) where {threaded}
+    (; f, dist_constructor, dist_logdensity_grad, rng, nb_samples) = rep
+    return print(
+        io,
+        "Reinforce{$threaded}($f, $dist_constructor, $dist_logdensity_grad, $rng, $nb_samples)",
+    )
+end
+
+function Reinforce(
     f::F,
     dist_constructor::D,
     dist_logdensity_grad::G=nothing;
@@ -41,12 +49,14 @@ function REINFORCE(
     nb_samples=1,
     threaded=false,
 ) where {F,D,G,R}
-    return REINFORCE{threaded,F,D,G,R}(
+    return Reinforce{threaded,F,D,G,R}(
         f, dist_constructor, dist_logdensity_grad, rng, nb_samples
     )
 end
 
-function logdensity_grad(rc::RuleConfig, F::REINFORCE{threaded}, x, θ...) where {threaded}
+function dist_logdensity_grad(
+    rc::RuleConfig, F::Reinforce{threaded}, x, θ...
+) where {threaded}
     (; dist_constructor, dist_logdensity_grad) = F
     if !isnothing(dist_logdensity_grad)
         dθ = dist_logdensity_grad(θ...)
@@ -66,11 +76,11 @@ function logdensity_grads_from_presamples(
     θ...;
     kwargs...,
 ) where {threaded}
-    _logdensity_grad_partial(x) = logdensity_grad(rc, F, x, θ...)
+    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
     if threaded
-        return tmap(_logdensity_grad_partial, xs)
+        return tmap(_dist_logdensity_grad_partial, xs)
     else
-        return map(_logdensity_grad_partial, xs)
+        return map(_dist_logdensity_grad_partial, xs)
     end
 end
 
@@ -81,28 +91,29 @@ function logdensity_grads_from_presamples(
     θ...;
     kwargs...,
 ) where {threaded}
-    _logdensity_grad_partial(x) = logdensity_grad(rc, F, x, θ...)
+    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
     if threaded
-        return tmap(_logdensity_grad_partial, eachcol(xs))
+        return tmap(_dist_logdensity_grad_partial, eachcol(xs))
     else
-        return map(_logdensity_grad_partial, eachcol(xs))
+        return map(_dist_logdensity_grad_partial, eachcol(xs))
     end
 end
 
 function ChainRulesCore.rrule(
-    rc::RuleConfig, F::REINFORCE{threaded}, θ...; kwargs...
+    rc::RuleConfig, F::Reinforce{threaded}, θ...; kwargs...
 ) where {threaded}
     project_θ = ProjectTo(θ)
 
     (; nb_samples) = F
     xs = presamples(F, θ...)
     ys = samples_from_presamples(F, xs; kwargs...)
+
     gs = logdensity_grads_from_presamples(rc, F, xs, θ...)
 
-    function REINFORCE_pullback(dy_thunked)
+    function pullback_Reinforce(dy_thunked)
         dy = unthunk(dy_thunked)
         dF = @not_implemented(
-            "The fields of the `REINFORCE` object are considered constant."
+            "The fields of the `Reinforce` object are considered constant."
         )
         _single_sample_pullback(g, y) = g .* dot(y, dy)
         dθ = if threaded
@@ -115,5 +126,5 @@ function ChainRulesCore.rrule(
     end
 
     y = threaded ? tmean(ys) : mean(ys)
-    return y, REINFORCE_pullback
+    return y, pullback_Reinforce
 end

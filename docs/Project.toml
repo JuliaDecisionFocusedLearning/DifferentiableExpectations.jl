@@ -1,3 +1,5 @@
 [deps]
 DifferentiableExpectations = "fc55d66b-b2a8-4ccc-9d64-c0c2166ceb36"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
+LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
