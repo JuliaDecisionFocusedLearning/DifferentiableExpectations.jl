@@ -33,6 +33,9 @@ using Zygote
     @testset "Reparametrization" begin
         include("reparametrization.jl")
     end
+    @testset "Distribution" begin
+        include("distribution.jl")
+    end
     @testset "Pushforward" begin
         include("pushforward.jl")
     end

@@ -39,12 +39,11 @@ end
             vec_exp_with_kwargs,
             (μ, σ) -> MvNormal(μ, Diagonal(σ .^ 2));
             rng=StableRNG(63),
-            nb_samples=10^4,
+            nb_samples=10^5,
             threaded=threaded,
         )
 
-        dim = 2
-        μ, σ = randn(dim), rand(dim)
+        μ, σ = [2.0, 3.0], [1.0, 0.5]
         true_mean(μ, σ) = mean.(LogNormal.(μ, σ))
         true_std(μ, σ) = std.(LogNormal.(μ, σ))
 
@@ -54,7 +53,7 @@ end
         ∂mean_est = jacobian((μ, σ) -> F(μ, σ; correct=true), μ, σ)
         ∂mean_true = jacobian(true_mean, μ, σ)
 
-        @test ∂mean_est[1] ≈ ∂mean_true[1] rtol = 0.2
-        @test ∂mean_est[2] ≈ ∂mean_true[2] rtol = 0.2
+        @test ∂mean_est[1] ≈ ∂mean_true[1] rtol = 0.1
+        @test ∂mean_est[2] ≈ ∂mean_true[2] rtol = 0.1
     end
 end
