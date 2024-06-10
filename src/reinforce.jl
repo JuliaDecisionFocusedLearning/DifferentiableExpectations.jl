@@ -28,7 +28,7 @@ true
     Reinforce(
         f,
         dist_constructor,
-        dist_gradlogpdf=nothing;
+        dist_logdensity_grad=nothing;
         rng=Random.default_rng(),
         nb_samples=1,
         threaded=false
@@ -43,10 +43,15 @@ $(TYPEDFIELDS)
 - [`DifferentiableExpectation`](@ref)
 """
 struct Reinforce{threaded,F,D,G,R<:AbstractRNG} <: DifferentiableExpectation{threaded}
+    "function applied inside the expectation"
     f::F
+    "constructor of the probability distribution `(θ...) -> p(θ)`"
     dist_constructor::D
+    "either `nothing` or a parameter gradient callable `(x, θ...) -> ∇₂logp(x, θ)`"
     dist_logdensity_grad::G
+    "random number generator"
     rng::R
+    "number of Monte-Carlo samples"
     nb_samples::Int
 end
 
@@ -76,9 +81,8 @@ function dist_logdensity_grad(
 ) where {threaded}
     (; dist_constructor, dist_logdensity_grad) = F
     if !isnothing(dist_logdensity_grad)
-        dθ = dist_logdensity_grad(θ...)
+        dθ = dist_logdensity_grad(x, θ...)
     else
-        # TODO: add Distributions.gradlogpdf
         _logdensity_partial(_θ...) = logdensityof(dist_constructor(_θ...), x)
         l, pullback = rrule_via_ad(rc, _logdensity_partial, θ...)
         dθ = Base.tail(pullback(one(l)))

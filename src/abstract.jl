@@ -9,8 +9,8 @@ Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(
 
 # Required fields
 
-  - `dist_constructor`: The constructor of the probability distribution.
   - `f`: The function applied inside the expectation.
+  - `dist_constructor`: The constructor of the probability distribution.
   - `rng::AbstractRNG`: The random number generator.
   - `nb_samples::Integer`: The number of Monte-Carlo samples.
 

@@ -1,7 +1,26 @@
+"""
+    TransformedDistribution
+
+Represent the probability distribution `p` of a random variable `X ∼ p` with a transformation `X = T(Z)` where `Z ∼ q`.
+
+# Fields
+
+$(TYPEDFIELDS)
+"""
 struct TransformedDistribution{D,T}
+    "the distribution `q` that gets transformed into `p`"
     base_dist::D
+    "the transformation function `T`"
     transformation::T
 end
+
+"""
+    reparametrize(dist)
+
+Turn a probability distribution `p` into a [`TransformedDistribution`](@ref) `(q, T)` such that the new distribution `q` does not depend on the parameters of `p`.
+These parameters are encoded (closed over) in the transformation function `T`.
+"""
+function reparametrize end
 
 function reparametrize(dist::Normal{T}) where {T}
     base_dist = Normal(zero(T), one(T))
@@ -54,9 +73,13 @@ $(TYPEDFIELDS)
 - [`DifferentiableExpectation`](@ref)
 """
 struct Reparametrization{threaded,F,D,R<:AbstractRNG} <: DifferentiableExpectation{threaded}
+    "function applied inside the expectation"
     f::F
+    "constructor of the probability distribution `(θ...) -> p(θ)`"
     dist_constructor::D
+    "random number generator"
     rng::R
+    "number of Monte-Carlo samples"
     nb_samples::Int
 end
 
