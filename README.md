@@ -1,5 +1,6 @@
 # DifferentiableExpectations.jl
 
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaDecisionFocusedLearning.github.io/DifferentiableExpectations.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaDecisionFocusedLearning.github.io/DifferentiableExpectations.jl/dev/)
 [![Build Status](https://github.com/JuliaDecisionFocusedLearning/DifferentiableExpectations.jl/actions/workflows/Test.yml/badge.svg?branch=main)](https://github.com/JuliaDecisionFocusedLearning/DifferentiableExpectations.jl/actions/workflows/Test.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/JuliaDecisionFocusedLearning/DifferentiableExpectations.jl/branch/main/graph/badge.svg)](https://app.codecov.io/gh/JuliaDecisionFocusedLearning/DifferentiableExpectations.jl)
