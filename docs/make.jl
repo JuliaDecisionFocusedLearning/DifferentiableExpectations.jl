@@ -13,8 +13,8 @@ makedocs(;
     format=Documenter.HTML(),
     pages=[
         "Home" => "index.md",  #
-        "Background" => "background.md",
         "API reference" => "api.md",
+        "Background" => "background.md",
     ],
     plugins=[bib],
 )
