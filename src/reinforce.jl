@@ -6,6 +6,23 @@ Differentiable parametric expectation `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`
 ∂F(θ) = 𝔼[f(X) ∇₂logp(X,θ)ᵀ]
 ```
 
+# Example
+
+```jldoctest
+using DifferentiableExpectations, Distributions, Zygote
+
+F = Reinforce(exp, Normal; nb_samples=10^5)
+F_true(μ, σ) = mean(LogNormal(μ, σ))
+
+μ, σ = 0.5, 1,0
+∇F, ∇F_true = gradient(F, μ, σ), gradient(F_true, μ, σ)
+isapprox(collect(∇F), collect(∇F_true); rtol=1e-1)
+
+# output
+
+true
+```
+
 # Constructor
 
     Reinforce(

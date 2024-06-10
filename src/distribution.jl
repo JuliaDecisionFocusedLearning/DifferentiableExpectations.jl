@@ -1,9 +1,34 @@
 """
-    FixedAtomsProbabilityDistribution
+    FixedAtomsProbabilityDistribution{threaded}
 
 A probability distribution with finite support and fixed atoms.
 
 Whenever its expectation is differentiated, only the weights are considered active, whereas the atoms are considered constant.
+
+# Example
+
+```jldoctest
+julia> using DifferentiableExpectations, Statistics, Zygote
+
+julia> dist = FixedAtomsProbabilityDistribution([2, 3], [0.4, 0.6]);
+
+julia> map(abs2, dist)
+FixedAtomsProbabilityDistribution{false}([4, 9], [0.4, 0.6])
+
+julia> mean(abs2, dist)
+7.0
+
+julia> gradient(mean, abs2, dist)[2]
+(atoms = nothing, weights = [4.0, 9.0])
+```
+
+# Constructor
+
+    FixedAtomsProbabilityDistribution(
+        atoms::Vector,
+        weights::Vector;
+        threaded=false
+    )
 
 # Fields
 
@@ -27,13 +52,30 @@ struct FixedAtomsProbabilityDistribution{threaded,A,W<:Real}
     end
 end
 
+function Base.show(
+    io::IO, dist::FixedAtomsProbabilityDistribution{threaded}
+) where {threaded}
+    (; atoms, weights) = dist
+    return print(io, "FixedAtomsProbabilityDistribution{$threaded}($atoms, $weights)")
+end
+
 Base.length(dist::FixedAtomsProbabilityDistribution) = length(dist.atoms)
 
+"""
+    rand(rng, dist::FixedAtomsProbabilityDistribution)
+
+Sample from the atoms of `dist` with probability proportional to their weights.
+"""
 function Random.rand(rng::AbstractRNG, dist::FixedAtomsProbabilityDistribution)
     (; atoms, weights) = dist
     return StatsBase.sample(rng, atoms, StatsBase.Weights(weights))
 end
 
+"""
+    map(f, dist::FixedAtomsProbabilityDistribution)
+
+Apply `f` to the atoms of `dist`, leave the weights unchanged.
+"""
 function Base.map(f, dist::FixedAtomsProbabilityDistribution{threaded}) where {threaded}
     (; atoms, weights) = dist
     new_atoms = if threaded
@@ -44,6 +86,11 @@ function Base.map(f, dist::FixedAtomsProbabilityDistribution{threaded}) where {t
     return FixedAtomsProbabilityDistribution(new_atoms, weights)
 end
 
+"""
+    mean(dist::FixedAtomsProbabilityDistribution)
+
+Compute the expectation of `dist`, i.e. the sum of all atoms multiplied by their respective weights.
+"""
 function Statistics.mean(dist::FixedAtomsProbabilityDistribution{threaded}) where {threaded}
     (; atoms, weights) = dist
     if threaded
@@ -53,6 +100,11 @@ function Statistics.mean(dist::FixedAtomsProbabilityDistribution{threaded}) wher
     end
 end
 
+"""
+    mean(f, dist::FixedAtomsProbabilityDistribution)
+
+Shortcut for `mean(map(f, dist))`.
+"""
 function Statistics.mean(f, dist::FixedAtomsProbabilityDistribution)
     return mean(map(f, dist))
 end

@@ -15,5 +15,5 @@ F(\theta) = \mathbb{E}_{p(\theta)}[f(X)]
 
 The following estimators are implemented:
 
-  - REINFORCE
-  - Reparametrization
+  - [REINFORCE](https://jmlr.org/papers/volume21/19-346/19-346.pdf#section.20)
+  - [Reparametrization](https://jmlr.org/papers/volume21/19-346/19-346.pdf#section.56)

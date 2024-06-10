@@ -11,6 +11,11 @@ using Zygote
 exp_with_kwargs(x; correct=false) = correct ? exp(x) : sin(x)
 vec_exp_with_kwargs(x; correct=false) = exp_with_kwargs.(x; correct)
 
+μ, σ = 0.5, 1.0
+true_mean(μ, σ) = mean(LogNormal(μ, σ))
+true_std(μ, σ) = std(LogNormal(μ, σ))
+∇mean_true = gradient(true_mean, μ, σ)
+
 @testset verbose = true "Univariate LogNormal" begin
     @testset verbose = true "Threaded: $threaded" for threaded in (false, true)
         @testset "$(nameof(typeof(F)))" for F in [
@@ -29,16 +34,13 @@ vec_exp_with_kwargs(x; correct=false) = exp_with_kwargs.(x; correct)
                 threaded=threaded,
             ),
         ]
-            μ, σ = 2.0, 1.0
-            true_mean(μ, σ) = mean(LogNormal(μ, σ))
-            true_std(μ, σ) = std(LogNormal(μ, σ))
+            string(F)
 
             @test F.dist_constructor(μ, σ) == Normal(μ, σ)
             @test F(μ, σ; correct=true) ≈ true_mean(μ, σ) rtol = 0.1
             @test std(samples(F, μ, σ; correct=true)) ≈ true_std(μ, σ) rtol = 0.1
 
             ∇mean_est = gradient((μ, σ) -> F(μ, σ; correct=true), μ, σ)
-            ∇mean_true = gradient(true_mean, μ, σ)
 
             @test ∇mean_est[1] ≈ ∇mean_true[1] rtol = 0.2
             @test ∇mean_est[2] ≈ ∇mean_true[2] rtol = 0.2

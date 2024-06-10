@@ -9,12 +9,16 @@ Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(
 
 # Required fields
 
-  - `dist_constructor`: The constructor of the probability distribution, such that calling `dist_constructor(θ...)` generates an object corresponding to `p(θ)`. This object must satisfy:
-  - the [Random API](https://docs.julialang.org/en/v1/stdlib/Random/#Hooking-into-the-Random-API)
-  - the [DensityInterface.jl API](https://github.com/JuliaMath/DensityInterface.jl)
+  - `dist_constructor`: The constructor of the probability distribution.
   - `f`: The function applied inside the expectation.
   - `rng::AbstractRNG`: The random number generator.
   - `nb_samples::Integer`: The number of Monte-Carlo samples.
+
+The field `dist_constructor` must be a callable such that `dist_constructor(θ...)` generates an object `dist` that corresponds to `p(θ)`.
+The resulting object `dist` needs to satisfy:
+
+  - the [Random API](https://docs.julialang.org/en/v1/stdlib/Random/#Hooking-into-the-Random-API) for sampling with `rand(rng, dist)`
+  - the [DensityInterface.jl API](https://github.com/JuliaMath/DensityInterface.jl) for loglikelihoods with `logdensityof(dist, x)`
 """
 abstract type DifferentiableExpectation{threaded} end
 
