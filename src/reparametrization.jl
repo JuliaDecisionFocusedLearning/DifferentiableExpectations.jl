@@ -80,7 +80,8 @@ true
         dist_constructor,
         rng=Random.default_rng(),
         nb_samples=1,
-        threaded=false
+        threaded=false,
+        seed=nothing
     )
 
 # Fields
@@ -91,7 +92,8 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct Reparametrization{threaded,F,D,R<:AbstractRNG} <: DifferentiableExpectation{threaded}
+struct Reparametrization{threaded,F,D,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
+       DifferentiableExpectation{threaded}
     "function applied inside the expectation"
     f::F
     "constructor of the probability distribution `(θ...) -> p(θ)`"
@@ -100,6 +102,8 @@ struct Reparametrization{threaded,F,D,R<:AbstractRNG} <: DifferentiableExpectati
     rng::R
     "number of Monte-Carlo samples"
     nb_samples::Int
+    "seed for the random number generator, reset before each call. Set to `nothing` for no seeding."
+    seed::S
 end
 
 function Base.show(io::IO, rep::Reparametrization{threaded}) where {threaded}
@@ -110,9 +114,14 @@ function Base.show(io::IO, rep::Reparametrization{threaded}) where {threaded}
 end
 
 function Reparametrization(
-    f::F, dist_constructor::D; rng::R=default_rng(), nb_samples=1, threaded=false
-) where {F,D,R}
-    return Reparametrization{threaded,F,D,R}(f, dist_constructor, rng, nb_samples)
+    f::F,
+    dist_constructor::D;
+    rng::R=default_rng(),
+    nb_samples=1,
+    threaded=false,
+    seed::S=nothing,
+) where {F,D,R,S}
+    return Reparametrization{threaded,F,D,R,S}(f, dist_constructor, rng, nb_samples, seed)
 end
 
 function ChainRulesCore.rrule(
