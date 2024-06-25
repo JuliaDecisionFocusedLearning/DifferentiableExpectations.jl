@@ -15,6 +15,7 @@ normal_logdensity_grad(x, θ...) = gradient((_θ...) -> logpdf(Normal(_θ...), x
 
 @testset verbose = true "Univariate LogNormal" begin
     μ, σ = 0.5, 1.0
+    seed = 63
     true_mean(μ, σ) = mean(LogNormal(μ, σ))
     true_std(μ, σ) = std(LogNormal(μ, σ))
     ∇mean_true = gradient(true_mean, μ, σ)
@@ -24,28 +25,32 @@ normal_logdensity_grad(x, θ...) = gradient((_θ...) -> logpdf(Normal(_θ...), x
             Reinforce(
                 exp_with_kwargs,
                 Normal;
-                rng=StableRNG(63),
+                rng=StableRNG(seed),
                 nb_samples=10^4,
                 threaded=threaded,
+                seed=seed,
             ),
             Reinforce(
                 exp_with_kwargs,
                 Normal,
                 normal_logdensity_grad;
-                rng=StableRNG(63),
+                rng=StableRNG(seed),
                 nb_samples=10^4,
                 threaded=threaded,
+                seed=seed,
             ),
             Reparametrization(
                 exp_with_kwargs,
                 Normal;
-                rng=StableRNG(63),
+                rng=StableRNG(seed),
                 nb_samples=10^4,
                 threaded=threaded,
+                seed=seed,
             ),
         ]
             string(F)
 
+            @test F(μ, σ; correct=true) == F(μ, σ; correct=true)
             @test F.dist_constructor(μ, σ) == Normal(μ, σ)
             @test F(μ, σ; correct=true) ≈ true_mean(μ, σ) rtol = 0.1
             @test std(samples(F, μ, σ; correct=true)) ≈ true_std(μ, σ) rtol = 0.1

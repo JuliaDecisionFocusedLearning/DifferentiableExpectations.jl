@@ -24,6 +24,7 @@ Return a Monte-Carlo average `(1/s) ∑f(xᵢ)` where the `xᵢ ∼ p(θ)` are i
   - `dist_constructor`: The constructor of the probability distribution.
   - `rng::AbstractRNG`: The random number generator.
   - `nb_samples::Integer`: The number of Monte-Carlo samples.
+  - `seed`::Union{Nothing,Integer}: The seed for the random number generator, reset before each call. Set to `nothing` for no seeding.
 
 The field `dist_constructor` must be a callable such that `dist_constructor(θ...)` generates an object `dist` that corresponds to `p(θ)`.
 The resulting object `dist` needs to satisfy:
@@ -39,8 +40,9 @@ abstract type DifferentiableExpectation{threaded} end
 Return a vector `[x₁, ..., xₛ]` or matrix `[x₁ ... xₛ]` where the `xᵢ ∼ p(θ)` are iid samples.
 """
 function presamples(F::DifferentiableExpectation, θ...)
-    (; dist_constructor, rng, nb_samples) = F
+    (; dist_constructor, rng, nb_samples, seed) = F
     dist = dist_constructor(θ...)
+    isnothing(seed) || seed!(rng, seed)
     xs = maybe_eachcol(rand(rng, dist, nb_samples))
     return xs
 end

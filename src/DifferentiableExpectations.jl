@@ -24,7 +24,7 @@ using Distributions: Distribution, MvNormal, Normal
 using DocStringExtensions
 using LinearAlgebra: Diagonal, cholesky, dot
 using OhMyThreads: tmap, treduce, tmapreduce
-using Random: Random, AbstractRNG, default_rng
+using Random: Random, AbstractRNG, default_rng, seed!
 using Statistics: Statistics, cov, mean, std
 using StatsBase: StatsBase
 

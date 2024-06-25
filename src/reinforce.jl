@@ -31,7 +31,8 @@ true
         dist_logdensity_grad=nothing;
         rng=Random.default_rng(),
         nb_samples=1,
-        threaded=false
+        threaded=false,
+        seed=nothing
     )
 
 # Fields
@@ -42,7 +43,8 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct Reinforce{threaded,F,D,G,R<:AbstractRNG} <: DifferentiableExpectation{threaded}
+struct Reinforce{threaded,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
+       DifferentiableExpectation{threaded}
     "function applied inside the expectation"
     f::F
     "constructor of the probability distribution `(θ...) -> p(θ)`"
@@ -53,6 +55,8 @@ struct Reinforce{threaded,F,D,G,R<:AbstractRNG} <: DifferentiableExpectation{thr
     rng::R
     "number of Monte-Carlo samples"
     nb_samples::Int
+    "seed for the random number generator, reset before each call. Set to `nothing` for no seeding."
+    seed::S
 end
 
 function Base.show(io::IO, rep::Reinforce{threaded}) where {threaded}
@@ -70,9 +74,10 @@ function Reinforce(
     rng::R=default_rng(),
     nb_samples=1,
     threaded=false,
-) where {F,D,G,R}
-    return Reinforce{threaded,F,D,G,R}(
-        f, dist_constructor, dist_logdensity_grad, rng, nb_samples
+    seed::S=nothing,
+) where {F,D,G,R,S}
+    return Reinforce{threaded,F,D,G,R,S}(
+        f, dist_constructor, dist_logdensity_grad, rng, nb_samples, seed
     )
 end
 
