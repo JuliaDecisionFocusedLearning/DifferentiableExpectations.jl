@@ -43,7 +43,7 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct Reinforce{threaded,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
+struct Reinforce{threaded,variance_reduction,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
        DifferentiableExpectation{threaded}
     "function applied inside the expectation"
     f::F
@@ -59,11 +59,13 @@ struct Reinforce{threaded,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
     seed::S
 end
 
-function Base.show(io::IO, rep::Reinforce{threaded}) where {threaded}
+function Base.show(
+    io::IO, rep::Reinforce{threaded,variance_reduction}
+) where {threaded,variance_reduction}
     (; f, dist_constructor, dist_logdensity_grad, rng, nb_samples) = rep
     return print(
         io,
-        "Reinforce{$threaded}($f, $dist_constructor, $dist_logdensity_grad, $rng, $nb_samples)",
+        "Reinforce{$threaded,$variance_reduction}($f, $dist_constructor, $dist_logdensity_grad, $rng, $nb_samples)",
     )
 end
 
@@ -74,9 +76,10 @@ function Reinforce(
     rng::R=default_rng(),
     nb_samples=1,
     threaded=false,
+    variance_reduction=true,
     seed::S=nothing,
 ) where {F,D,G,R,S}
-    return Reinforce{threaded,F,D,G,R,S}(
+    return Reinforce{threaded,variance_reduction,F,D,G,R,S}(
         f, dist_constructor, dist_logdensity_grad, rng, nb_samples, seed
     )
 end
@@ -96,8 +99,8 @@ function dist_logdensity_grad(
 end
 
 function ChainRulesCore.rrule(
-    rc::RuleConfig, F::Reinforce{threaded}, θ...; kwargs...
-) where {threaded}
+    rc::RuleConfig, F::Reinforce{threaded,variance_reduction}, θ...; kwargs...
+) where {threaded,variance_reduction}
     project_θ = ProjectTo(θ)
 
     (; nb_samples) = F
@@ -111,6 +114,20 @@ function ChainRulesCore.rrule(
         map(_dist_logdensity_grad_partial, xs)
     end
 
+    ys_with_baseline = if variance_reduction && nb_samples > 1
+        y_sum = threaded ? tmean(ys) : mean(ys)
+        map(ys) do yᵢ
+            yᵢ .- y_sum
+        end
+    else
+        ys
+    end
+    K = if variance_reduction && nb_samples > 1
+        nb_samples - 1
+    else
+        nb_samples
+    end
+
     function pullback_Reinforce(dy_thunked)
         dy = unthunk(dy_thunked)
         dF = @not_implemented(
@@ -118,9 +135,9 @@ function ChainRulesCore.rrule(
         )
         _single_sample_pullback(g, y) = g .* dot(y, dy)
         dθ = if threaded
-            tmapreduce(_single_sample_pullback, .+, gs, ys) ./ nb_samples
+            tmapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
         else
-            mapreduce(_single_sample_pullback, .+, gs, ys) ./ nb_samples
+            mapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
         end
         dθ_proj = project_θ(dθ)
         return (dF, dθ_proj...)

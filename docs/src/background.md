@@ -42,10 +42,21 @@ And the vector-Jacobian product:
 \partial F(\theta)^\top v = \mathbb{E}_{p(\theta)} \left[(f(X)^\top v) \nabla_\theta \log p(X, \theta)\right]
 ```
 
-### Variance reduction
+### Variance reduction (k > 1)
 
-!!! warning
-    Work in progress.
+The Reinforce estimator having high variance, it can be reduced by using a baseline (see this [paper](https://openreview.net/pdf?id=r1lgTGL5DE)) as follows:
+```math
+\begin{aligned}
+\partial F(\theta) &\simeq \frac{1}{k}\sum_{i=1}^k f(x_k) \nabla_\theta\log p(x_k, \theta)^\top\\
+& \simeq \frac{1}{k}\sum_{i=1}^k \left(f(x_i) - \frac{1}{k - 1}\sum_{j\neq i} f(x_j)\right) \nabla_\theta\log p(x_i, \theta)^\top\\
+& = \frac{1}{k - 1}\sum_{i=1}^k \left(f(x_i) - \frac{1}{k}\sum_{j=1}^k f(x_j)\right) \nabla_\theta\log p(x_i, \theta)^\top
+\end{aligned}
+```
+
+This gives the following Vector-Jacobian product:
+```math
+\partial F(\theta)^\top v \simeq \frac{1}{k - 1}\sum_{i=1}^k \left(\left(f(x_i) - \frac{1}{k}\sum_{j=1}^k f(x_j)\right)^\top v\right) \nabla_\theta\log p(x_i, \theta)^\top
+```
 
 ## Reparametrization
 
