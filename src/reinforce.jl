@@ -115,7 +115,11 @@ function ChainRulesCore.rrule(
         map(_dist_logdensity_grad_partial, xs)
     end
 
-    ys_with_baseline = (variance_reduction && nb_samples > 1) ? ys .- y : ys
+    ys_with_baseline = if (variance_reduction && nb_samples > 1)
+        map(yi -> yi .- y, ys)
+    else
+        ys
+    end
     K = nb_samples - (variance_reduction && nb_samples > 1)
 
     function pullback_Reinforce(dy_thunked)
