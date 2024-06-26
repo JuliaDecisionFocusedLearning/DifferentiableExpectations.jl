@@ -44,8 +44,22 @@ And the vector-Jacobian product:
 
 ### Variance reduction
 
-!!! warning
-    Work in progress.
+Since the REINFORCE estimator has high variance, it can be reduced by using a baseline [koolBuyREINFORCESamples2022](@citep).
+For $k > 1$ Monte-Carlo samples, we have
+
+```math
+\begin{aligned}
+\partial F(\theta) &\simeq \frac{1}{k}\sum_{i=1}^k f(x_k) \nabla_\theta\log p(x_k, \theta)^\top\\
+& \simeq \frac{1}{k}\sum_{i=1}^k \left(f(x_i) - \frac{1}{k - 1}\sum_{j\neq i} f(x_j)\right) \nabla_\theta\log p(x_i, \theta)^\top\\
+& = \frac{1}{k - 1}\sum_{i=1}^k \left(f(x_i) - \frac{1}{k}\sum_{j=1}^k f(x_j)\right) \nabla_\theta\log p(x_i, \theta)^\top
+\end{aligned}
+```
+
+This gives the following vector-Jacobian product:
+
+```math
+\partial F(\theta)^\top v \simeq \frac{1}{k - 1}\sum_{i=1}^k \left(\left(f(x_i) - \frac{1}{k}\sum_{j=1}^k f(x_j)\right)^\top v\right) \nabla_\theta\log p(x_i, \theta)
+```
 
 ## Reparametrization
 

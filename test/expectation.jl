@@ -96,3 +96,19 @@ end;
         end
     end
 end
+
+@testset "Reinforce variance reduction" begin
+    μ, σ = 0.5, 1.0
+    seed = 63
+
+    r = Reinforce(exp, Normal; nb_samples=100, variance_reduction=true, rng=StableRNG(seed))
+    r_no_vr = Reinforce(
+        exp, Normal; nb_samples=100, variance_reduction=false, rng=StableRNG(seed)
+    )
+
+    grads = [gradient(r, μ, σ) for _ in 1:1000]
+    grads_no_vr = [gradient(r_no_vr, μ, σ) for _ in 1:1000]
+
+    @test var(first.(grads)) < var(first.(grads_no_vr))
+    @test var(last.(grads)) < var(last.(grads_no_vr))
+end
