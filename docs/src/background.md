@@ -42,9 +42,10 @@ And the vector-Jacobian product:
 \partial F(\theta)^\top v = \mathbb{E}_{p(\theta)} \left[(f(X)^\top v) \nabla_\theta \log p(X, \theta)\right]
 ```
 
-### Variance reduction (k > 1)
+### Variance reduction
 
-The Reinforce estimator having high variance, it can be reduced by using a baseline [koolBuyREINFORCESamples2022](@citep) as follows:
+Since the REINFORCE estimator has high variance, it can be reduced by using a baseline [koolBuyREINFORCESamples2022](@citep).
+For $k > 1$ Monte-Carlo samples, we have
 
 ```math
 \begin{aligned}
