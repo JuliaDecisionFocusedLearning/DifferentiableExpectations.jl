@@ -97,30 +97,28 @@ end;
     end
 end
 
-@testset "Variance reduction" begin
+@testset "Reinforce variance reduction" begin
+    D = 100
+    f(x) = sum(x)
+    dist_constructor(σ) = MvNormal(fill(0.5, D), σ^2 * I)
+    N = 1000
+    σ = 0.1
     for seed in 1:10
-        rng = StableRNG(seed)
-        f(x) = x
-        dist_constructor(θ) = MvNormal(θ, I)
-        n = 10
-        θ = randn(rng, n)
         r = Reinforce(
-            f, dist_constructor; rng=rng, nb_samples=100, seed=seed, variance_reduction=true
+            f,
+            dist_constructor;
+            nb_samples=100,
+            variance_reduction=true,
+            rng=StableRNG(seed),
         )
         r_no_variance_reduction = Reinforce(
             f,
             dist_constructor;
-            rng=rng,
             nb_samples=100,
-            seed=seed,
             variance_reduction=false,
+            rng=StableRNG(seed),
         )
 
-        J_reduced_variance = jacobian(r, θ)[1]
-        J_no_reduced_variance = jacobian(r_no_variance_reduction, θ)[1]
-        J_true = Matrix(I, n, n)
-
-        mape(x::AbstractArray, y::AbstractArray) = mean(abs.(x .- y))
-        @test mape(J_reduced_variance, J_true) < mape(J_no_reduced_variance, J_true)
+        @test var([gradient(r, σ)[1] for _ in 1:N]) < var([gradient(r_no_variance_reduction, σ)[1] for _ in 1:N])
     end
 end
