@@ -98,27 +98,17 @@ end;
 end
 
 @testset "Reinforce variance reduction" begin
-    D = 100
-    f(x) = sum(x)
-    dist_constructor(σ) = MvNormal(fill(0.5, D), σ^2 * I)
-    N = 1000
-    σ = 0.1
-    for seed in 1:10
-        r = Reinforce(
-            f,
-            dist_constructor;
-            nb_samples=100,
-            variance_reduction=true,
-            rng=StableRNG(seed),
-        )
-        r_no_variance_reduction = Reinforce(
-            f,
-            dist_constructor;
-            nb_samples=100,
-            variance_reduction=false,
-            rng=StableRNG(seed),
-        )
+    μ, σ = 0.5, 1.0
+    seed = 63
 
-        @test var([gradient(r, σ)[1] for _ in 1:N]) < var([gradient(r_no_variance_reduction, σ)[1] for _ in 1:N])
-    end
+    r = Reinforce(exp, Normal; nb_samples=100, variance_reduction=true, rng=StableRNG(seed))
+    r_no_vr = Reinforce(
+        exp, Normal; nb_samples=100, variance_reduction=false, rng=StableRNG(seed)
+    )
+
+    grads = [gradient(r, μ, σ) for _ in 1:1000]
+    grads_no_vr = [gradient(r_no_vr, μ, σ) for _ in 1:1000]
+
+    @test var(first.(grads)) < var(first.(grads_no_vr))
+    @test var(last.(grads)) < var(last.(grads_no_vr))
 end

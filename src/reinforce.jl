@@ -106,7 +106,7 @@ function ChainRulesCore.rrule(
     (; nb_samples) = F
     xs = presamples(F, θ...)
     ys = samples_from_presamples(F, xs; kwargs...)
-    y_mean = threaded ? tmean(ys) : mean(ys)
+    y = threaded ? tmean(ys) : mean(ys)
 
     _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
     gs = if threaded
@@ -115,18 +115,8 @@ function ChainRulesCore.rrule(
         map(_dist_logdensity_grad_partial, xs)
     end
 
-    y = if variance_reduction && nb_samples > 1
-        map(ys) do yᵢ
-            yᵢ .- y_mean
-        end
-    else
-        ys
-    end
-    K = if variance_reduction && nb_samples > 1
-        nb_samples - 1
-    else
-        nb_samples
-    end
+    ys_with_baseline = (variance_reduction && nb_samples > 1) ? ys .- y : ys
+    K = nb_samples - (variance_reduction && nb_samples > 1)
 
     function pullback_Reinforce(dy_thunked)
         dy = unthunk(dy_thunked)
@@ -135,13 +125,13 @@ function ChainRulesCore.rrule(
         )
         _single_sample_pullback(g, y) = g .* dot(y, dy)
         dθ = if threaded
-            tmapreduce(_single_sample_pullback, .+, gs, y) ./ K
+            tmapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
         else
-            mapreduce(_single_sample_pullback, .+, gs, y) ./ K
+            mapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
         end
         dθ_proj = project_θ(dθ)
         return (dF, dθ_proj...)
     end
 
-    return y_mean, pullback_Reinforce
+    return y, pullback_Reinforce
 end
