@@ -20,7 +20,7 @@ using ChainRulesCore:
     rrule_via_ad,
     unthunk
 using DensityInterface: logdensityof
-using Distributions: Distribution, MvNormal, Normal
+using Distributions: Distribution, MvNormal, Normal, UnivariateDistribution
 using DocStringExtensions
 using LinearAlgebra: Diagonal, cholesky, dot
 using OhMyThreads: tmap, treduce, tmapreduce

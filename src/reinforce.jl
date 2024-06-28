@@ -84,6 +84,14 @@ function Reinforce(
     )
 end
 
+function _logdensity(dist::Array{<:UnivariateDistribution}, x)
+    return sum(logdensityof(d, xi) for (d, xi) in zip(dist, x))
+end
+
+function _logdensity(dist, x)
+    return logdensityof(dist, x)
+end
+
 function dist_logdensity_grad(
     rc::RuleConfig, F::Reinforce{threaded}, x, θ...
 ) where {threaded}
@@ -91,7 +99,7 @@ function dist_logdensity_grad(
     if !isnothing(dist_logdensity_grad)
         dθ = dist_logdensity_grad(x, θ...)
     else
-        _logdensity_partial(_θ...) = logdensityof(dist_constructor(_θ...), x)
+        _logdensity_partial(_θ...) = _logdensity(dist_constructor(_θ...), x)
         l, pullback = rrule_via_ad(rc, _logdensity_partial, θ...)
         dθ = Base.tail(pullback(one(l)))
     end

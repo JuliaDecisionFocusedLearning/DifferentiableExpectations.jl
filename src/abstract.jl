@@ -34,6 +34,16 @@ The resulting object `dist` needs to satisfy:
 """
 abstract type DifferentiableExpectation{threaded} end
 
+function _sample(
+    dist_array::AbstractArray{<:UnivariateDistribution}, rng::AbstractRNG, nb_samples::Int
+)
+    return [map(d -> rand(rng, d), dist_array) for _ in 1:nb_samples]
+end
+
+function _sample(dist, rng::AbstractRNG, nb_samples::Int)
+    return rand(rng, dist, nb_samples)
+end
+
 """
     presamples(F::DifferentiableExpectation, θ...)
 
@@ -43,7 +53,7 @@ function presamples(F::DifferentiableExpectation, θ...)
     (; dist_constructor, rng, nb_samples, seed) = F
     dist = dist_constructor(θ...)
     isnothing(seed) || seed!(rng, seed)
-    xs = maybe_eachcol(rand(rng, dist, nb_samples))
+    xs = maybe_eachcol(_sample(dist, rng, nb_samples))
     return xs
 end
 
