@@ -15,7 +15,7 @@ E = Reinforce(exp, Normal; nb_samples=10^5)
 E_true(μ, σ) = mean(LogNormal(μ, σ))
 
 μ, σ = 0.5, 1,0
-∇E, ∇E_true = gradient(F, μ, σ), gradient(E_true, μ, σ)
+∇E, ∇E_true = gradient(E, μ, σ), gradient(E_true, μ, σ)
 isapprox(collect(∇E), collect(∇E_true); rtol=1e-1)
 
 # output
