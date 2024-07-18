@@ -61,12 +61,12 @@ Differentiable parametric expectation `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`
 ```jldoctest
 using DifferentiableExpectations, Distributions, Zygote
 
-F = Reparametrization(exp, Normal; nb_samples=10^4)
-F_true(μ, σ) = mean(LogNormal(μ, σ))
+E = Reparametrization(exp, Normal; nb_samples=10^4)
+E_true(μ, σ) = mean(LogNormal(μ, σ))
 
 μ, σ = 0.5, 1,0
-∇F, ∇F_true = gradient(F, μ, σ), gradient(F_true, μ, σ)
-isapprox(collect(∇F), collect(∇F_true); rtol=1e-1)
+∇E, ∇E_true = gradient(E, μ, σ), gradient(E_true, μ, σ)
+isapprox(collect(∇E), collect(∇E_true); rtol=1e-1)
 
 # output
 
@@ -92,8 +92,8 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct Reparametrization{threaded,F,D,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
-       DifferentiableExpectation{threaded}
+struct Reparametrization{t,F,D,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
+       DifferentiableExpectation{t}
     "function applied inside the expectation"
     f::F
     "constructor of the probability distribution `(θ...) -> p(θ)`"
@@ -117,15 +117,18 @@ function Reparametrization(
     return Reparametrization{threaded,F,D,R,S}(f, dist_constructor, rng, nb_samples, seed)
 end
 
-function ChainRulesCore.rrule(rc::RuleConfig, F::Reparametrization, θ...; kwargs...)
+function ChainRulesCore.rrule(rc::RuleConfig, E::Reparametrization, θ...; kwargs...)
     project_θ = ProjectTo(θ)
 
-    (; f, dist_constructor, rng, nb_samples) = F
+    (; f, dist_constructor, rng, nb_samples) = E
     dist = dist_constructor(θ...)
     transformed_dist = reparametrize(dist)
     zs = maybe_eachcol(rand(rng, transformed_dist.base_dist, nb_samples))
-    xs = tmap_or_map(F, transformed_dist.transformation, zs)
-    ys = samples_from_presamples(F, xs; kwargs...)
+    zdist = FixedAtomsProbabilityDistribution(zs; threaded=unval(is_threaded(E)))
+    xdist = map(transformed_dist.transformation, zdist)
+    fk = FixKwargs(f, kwargs)
+    ydist = map(fk, xdist)
+    y = mean(ydist)
 
     function h(z, θ)
         transformed_dist = reparametrize(dist_constructor(θ...))
@@ -142,11 +145,10 @@ function ChainRulesCore.rrule(rc::RuleConfig, F::Reparametrization, θ...; kwarg
             _, _, dθ = pb(dy)
             return dθ
         end
-        dθ = tmapreduce_or_mapreduce(F, _single_sample_pullback, .+, zs) ./ nb_samples
+        dθ = mymapreduce(is_threaded(E), _single_sample_pullback, .+, zs) ./ nb_samples
         dθ_proj = project_θ(dθ)
         return (dF, dθ_proj...)
     end
 
-    y = tmean_or_mean(F, ys)
     return y, pullback_Reparametrization
 end

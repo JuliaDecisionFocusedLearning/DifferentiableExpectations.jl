@@ -10,10 +10,19 @@ Whenever its expectation is differentiated, only the weights are considered acti
 ```jldoctest
 julia> using DifferentiableExpectations, Statistics, Zygote
 
+julia> using DifferentiableExpectations: atoms, weights
+
 julia> dist = FixedAtomsProbabilityDistribution([2, 3], [0.4, 0.6]);
 
-julia> map(abs2, dist)
-FixedAtomsProbabilityDistribution{false, Int64, Float64}([4, 9], [0.4, 0.6])
+julia> atoms(map(abs2, dist))
+2-element Vector{Int64}:
+ 4
+ 9
+
+julia> weights(map(abs2, dist))
+2-element Vector{Float64}:
+ 0.4
+ 0.6
 
 julia> mean(abs2, dist)
 7.0
@@ -25,8 +34,8 @@ julia> gradient(mean, abs2, dist)[2]
 # Constructor
 
     FixedAtomsProbabilityDistribution(
-        atoms::Vector,
-        weights::Vector;
+        atoms::AbstractVector,
+        weights::AbstractVector=uniform_weights(atoms);
         threaded=false
     )
 
@@ -34,37 +43,41 @@ julia> gradient(mean, abs2, dist)[2]
 
 $(TYPEDFIELDS)
 """
-struct FixedAtomsProbabilityDistribution{threaded,A,W<:Real}
-    atoms::Vector{A}
-    weights::Vector{W}
+struct FixedAtomsProbabilityDistribution{
+    threaded,A<:AbstractVector,W<:AbstractVector{<:Real}
+}
+    atoms::A
+    weights::W
 
     function FixedAtomsProbabilityDistribution(
-        atoms::Vector{A}, weights::Vector{W}; threaded::Bool=false
+        atoms::A, weights::W=uniform_weights(atoms); threaded::Bool=false
     ) where {A,W}
         if isempty(atoms) || isempty(weights)
             throw(ArgumentError("`atoms` and `weights` must be non-empty."))
         elseif length(atoms) != length(weights)
             throw(DimensionMismatch("`atoms` and `weights` must have the same length."))
-        elseif !isapprox(sum(weights), one(W); atol=1e-4)
+        elseif !isapprox(sum(weights), one(eltype(weights)); atol=1e-4)
             throw(ArgumentError("`weights` must be normalized to `1`."))
         end
         return new{threaded,A,W}(atoms, weights)
     end
 end
 
-tmap_or_map(::FixedAtomsProbabilityDistribution{true}, args...) = tmap(args...)
-tmap_or_map(::FixedAtomsProbabilityDistribution{false}, args...) = map(args...)
+"""
+    atoms(dist::FixedAtomsProbabilityDistribution)
 
-function tmapreduce_or_mapreduce(::FixedAtomsProbabilityDistribution{true}, args...)
-    return tmapreduce(args...)
-end
+Get the vector of atoms of a distribution.
+"""
+atoms(dist::FixedAtomsProbabilityDistribution) = dist.atoms
 
-function tmapreduce_or_mapreduce(::FixedAtomsProbabilityDistribution{false}, args...)
-    return mapreduce(args...)
-end
+"""
+    weights(dist::FixedAtomsProbabilityDistribution)
 
-tmean_or_mean(::FixedAtomsProbabilityDistribution{true}, args...) = tmean(args...)
-tmean_or_mean(::FixedAtomsProbabilityDistribution{false}, args...) = mean(args...)
+Get the vector of weights of a distribution.
+"""
+weights(dist::FixedAtomsProbabilityDistribution) = dist.weights
+
+is_threaded(::FixedAtomsProbabilityDistribution{t}) where {t} = Val(t)
 
 Base.length(dist::FixedAtomsProbabilityDistribution) = length(dist.atoms)
 
@@ -83,9 +96,9 @@ end
 
 Apply `f` to the atoms of `dist`, leave the weights unchanged.
 """
-function Base.map(f, dist::FixedAtomsProbabilityDistribution{threaded}) where {threaded}
+function Base.map(f, dist::FixedAtomsProbabilityDistribution)
     (; atoms, weights) = dist
-    new_atoms = tmap_or_map(dist, f, atoms)
+    new_atoms = mymap(is_threaded(dist), f, atoms)
     return FixedAtomsProbabilityDistribution(new_atoms, weights)
 end
 
@@ -94,9 +107,9 @@ end
 
 Compute the expectation of `dist`, i.e. the sum of all atoms multiplied by their respective weights.
 """
-function Statistics.mean(dist::FixedAtomsProbabilityDistribution{threaded}) where {threaded}
+function Statistics.mean(dist::FixedAtomsProbabilityDistribution)
     (; atoms, weights) = dist
-    return tmapreduce_or_mapreduce(dist, *, +, weights, atoms)
+    return mymapreduce(is_threaded(dist), *, +, weights, atoms)
 end
 
 """
@@ -113,7 +126,7 @@ function ChainRulesCore.rrule(::typeof(mean), dist::FixedAtomsProbabilityDistrib
     e = mean(dist)
     function dist_mean_pullback(Δe)
         Δatoms = NoTangent()
-        Δweights = tmap_or_map(dist, Base.Fix1(dot, Δe), atoms)
+        Δweights = mymap(is_threaded(dist), Base.Fix1(dot, Δe), atoms)
         Δdist = Tangent{FixedAtomsProbabilityDistribution}(; atoms=Δatoms, weights=Δweights)
         return NoTangent(), Δdist
     end
@@ -126,7 +139,7 @@ function ChainRulesCore.rrule(::typeof(mean), f, dist::FixedAtomsProbabilityDist
     e = mean(new_dist)
     function dist_fmean_pullback(Δe)
         Δatoms = NoTangent()
-        Δweights = tmap_or_map(dist, Base.Fix1(dot, Δe), new_atoms)
+        Δweights = mymap(is_threaded(dist), Base.Fix1(dot, Δe), new_atoms)
         Δdist = Tangent{FixedAtomsProbabilityDistribution}(; atoms=Δatoms, weights=Δweights)
         return NoTangent(), NoTangent(), Δdist
     end

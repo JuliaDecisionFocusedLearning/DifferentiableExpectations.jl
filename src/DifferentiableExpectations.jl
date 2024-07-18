@@ -19,6 +19,7 @@ using ChainRulesCore:
     rrule,
     rrule_via_ad,
     unthunk
+using Compat: @compat
 using DensityInterface: logdensityof
 using Distributions: Distribution, MvNormal, Normal
 using DocStringExtensions
@@ -38,5 +39,8 @@ export DifferentiableExpectation
 export Reinforce
 export Reparametrization
 export FixedAtomsProbabilityDistribution
+export empirical_distribution
+
+@compat public atoms, weights
 
 end # module DifferentiableExpectations

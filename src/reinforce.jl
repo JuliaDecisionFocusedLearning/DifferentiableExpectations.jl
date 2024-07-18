@@ -11,12 +11,12 @@ Differentiable parametric expectation `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`
 ```jldoctest
 using DifferentiableExpectations, Distributions, Zygote
 
-F = Reinforce(exp, Normal; nb_samples=10^5)
-F_true(μ, σ) = mean(LogNormal(μ, σ))
+E = Reinforce(exp, Normal; nb_samples=10^5)
+E_true(μ, σ) = mean(LogNormal(μ, σ))
 
 μ, σ = 0.5, 1,0
-∇F, ∇F_true = gradient(F, μ, σ), gradient(F_true, μ, σ)
-isapprox(collect(∇F), collect(∇F_true); rtol=1e-1)
+∇E, ∇E_true = gradient(F, μ, σ), gradient(E_true, μ, σ)
+isapprox(collect(∇E), collect(∇E_true); rtol=1e-1)
 
 # output
 
@@ -43,8 +43,8 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct Reinforce{threaded,variance_reduction,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
-       DifferentiableExpectation{threaded}
+struct Reinforce{t,variance_reduction,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
+       DifferentiableExpectation{t}
     "function applied inside the expectation"
     f::F
     "constructor of the probability distribution `(θ...) -> p(θ)`"
@@ -74,10 +74,8 @@ function Reinforce(
     )
 end
 
-function dist_logdensity_grad(
-    rc::RuleConfig, F::Reinforce{threaded}, x, θ...
-) where {threaded}
-    (; dist_constructor, dist_logdensity_grad) = F
+function dist_logdensity_grad(rc::RuleConfig, E::Reinforce, x, θ...)
+    (; dist_constructor, dist_logdensity_grad) = E
     if !isnothing(dist_logdensity_grad)
         dθ = dist_logdensity_grad(x, θ...)
     else
@@ -89,20 +87,23 @@ function dist_logdensity_grad(
 end
 
 function ChainRulesCore.rrule(
-    rc::RuleConfig, F::Reinforce{threaded,variance_reduction}, θ...; kwargs...
-) where {threaded,variance_reduction}
+    rc::RuleConfig, E::Reinforce{t,variance_reduction}, θ...; kwargs...
+) where {t,variance_reduction}
     project_θ = ProjectTo(θ)
 
-    (; nb_samples) = F
-    xs = presamples(F, θ...)
-    ys = samples_from_presamples(F, xs; kwargs...)
-    y = tmean_or_mean(F, ys)
+    (; f, nb_samples) = E
+    xdist = empirical_predistribution(E, θ...)
+    xs = atoms(xdist)
+    fk = FixKwargs(f, kwargs)
+    ydist = map(fk, xdist)
+    ys = atoms(ydist)
+    y = mean(ydist)
 
-    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
-    gs = tmap_or_map(F, _dist_logdensity_grad_partial, xs)
+    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, E, x, θ...)
+    gs = mymap(is_threaded(E), _dist_logdensity_grad_partial, xs)
 
     ys_with_baseline = if (variance_reduction && nb_samples > 1)
-        tmap_or_map(F, yi -> yi .- y, ys)
+        mymap(is_threaded(E), yi -> yi .- y, ys)
     else
         ys
     end
@@ -115,8 +116,9 @@ function ChainRulesCore.rrule(
         )
         _single_sample_pullback(g, y) = g .* dot(y, dy)
         dθ =
-            tmapreduce_or_mapreduce(F, _single_sample_pullback, .+, gs, ys_with_baseline) ./
-            K
+            mymapreduce(
+                is_threaded(E), _single_sample_pullback, .+, gs, ys_with_baseline
+            ) ./ K
         dθ_proj = project_θ(dθ)
         return (dF, dθ_proj...)
     end

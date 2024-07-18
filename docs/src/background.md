@@ -1,84 +1,75 @@
 # Background
 
-Consider a function ``f: \mathbb{R}^n \to \mathbb{R}^m`` and a parametric probability distribution ``p(\theta)`` on the input space ``\mathbb{R}^n``.
-Given a random variable ``X \sim p(\theta)``, we want to differentiate the following expectation with respect to ``\theta``:
-
-```math
-F(\theta) = \mathbb{E}_{p(\theta)}[f(X)]
-```
-
-Since ``F`` is a vector-to-vector function, the key quantity we want to compute is its Jacobian matrix ``\partial F(\theta) \in \mathbb{R}^{m \times n}``.
-However, to implement automatic differentiation, we only need vector-Jacobian products (VJPs) ``\partial F(\theta)^\top v`` with ``v \in \mathbb{R}^m``, also called pullbacks.
-See the book by [blondelElementsDifferentiableProgramming2024](@citet) to know more.
-
 Most of the math below is taken from [mohamedMonteCarloGradient2020](@citet).
 
-## Empirical distribution
+Consider a function $f: \mathbb{R}^n \to \mathbb{R}^m$, a parameter $\theta \in \mathbb{R}^d$ and a parametric probability distribution $p(\theta)$ on the input space.
+Given a random variable $X \sim p(\theta)$, we want to differentiate the expectation of $Y = f(X)$ with respect to $\theta$:
 
-Implemented by [`FixedAtomsProbabilityDistribution`](@ref).
+$$
+E(\theta) = \mathbb{E}[f(X)] = \int f(x) ~ p(x | \theta) ~\mathrm{d} x
+$$
 
-### Mean
+Usually this is approximated with Monte-Carlo sampling: let $x_1, \dots, x_S \sim p(\theta)$ be i.i.d., we have the estimator
 
-An empirical distribution ``\pi`` is given by a set of atoms ``a_i`` and associated weights ``w_i \geq 0`` such that ``\sum_i w_i = 1``.
-Its expectation is ``\mathbb{E}[\pi] = \sum w_i a_i``.
-The gradient of this expectation with respect to weight ``w_j`` is ``\partial_{w_j} \mathbb{E}[\pi] = a_j``.
-Thus, the vector-Jacobian product is:
+$$
+E(\theta) \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)
+$$
 
-```math
-\left(\partial_{w_j} \mathbb{E}[\pi]\right)^\top v = a_j^\top v 
-```
+## Autodiff
 
-We assume the atoms are kept constant during differentiation.
+Since $E$ is a vector-to-vector function, the key quantity we want to compute is its Jacobian matrix $\partial E(\theta) \in \mathbb{R}^{m \times n}$:
+
+$$
+\partial E(\theta) = \int y ~ \nabla_\theta q(y | \theta)^\top ~ \mathrm{d} y = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~\mathrm{d} x
+$$
+
+However, to implement automatic differentiation, we only need the vector-Jacobian product (VJP) $\partial E(\theta)^\top \bar{y}$ with an output cotangent $\bar{y} \in \mathbb{R}^m$.
+See the book by [blondelElementsDifferentiableProgramming2024](@citet) to know more.
+
+Our goal is to rephrase this VJP as an expectation, so that we may approximate it with Monte-Carlo sampling as well.
 
 ## REINFORCE
 
 Implemented by [`Reinforce`](@ref).
 
-### Principle
+### Score function
 
-The REINFORCE estimator is derived with the help of the identity ``\nabla \log u = \nabla u / u``:
+The REINFORCE estimator is derived with the help of the identity $\nabla \log u = \nabla u / u$:
 
-```math
+$$
 \begin{aligned}
-F(\theta + \varepsilon)
-& = \int f(x) ~ p(x, \theta + \varepsilon) ~ \mathrm{d}x \\
-& \approx \int f(x) ~ \left(p(x, \theta) + \nabla_\theta p(x, \theta)^\top \varepsilon\right) ~ \mathrm{d}x \\
-& = \int f(x) ~ \left(p(x, \theta) + p(x, \theta) \nabla_\theta \log p(x, \theta)^\top \varepsilon\right) ~ \mathrm{d}x \\
-& = F(\theta) + \left(\int f(x) ~ p(x, \theta) \nabla_\theta \log p(x, \theta)^\top ~ \mathrm{d}x\right) \varepsilon \\
-& = F(\theta) + \mathbb{E}_{p(\theta)} \left[f(X) \nabla_\theta \log p(X, \theta)^\top\right] ~ \varepsilon \\
+\partial E(\theta)
+& = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~ \mathrm{d}x \\
+& = \int f(x) ~ p(x | \theta) \nabla_\theta \log p(x | \theta)^\top ~ \mathrm{d}x \\
+& = \mathbb{E} \left[f(X) \nabla_\theta \log p(X | \theta)^\top\right] \\
 \end{aligned}
-```
+$$
 
-We thus identify the Jacobian matrix:
+And the VJP:
 
-```math
-\partial F(\theta) = \mathbb{E}_{p(\theta)} \left[f(X) \nabla_\theta \log p(X, \theta)^\top\right]
-```
+$$
+\partial E(\theta)^\top \bar{y} = \mathbb{E} \left[f(X)^\top \bar{y} ~\nabla_\theta \log p(X | \theta)\right]
+$$
 
-And the vector-Jacobian product:
+Our Monte-Carlo approximation will therefore be:
 
-```math
-\partial F(\theta)^\top v = \mathbb{E}_{p(\theta)} \left[(f(X)^\top v) \nabla_\theta \log p(X, \theta)\right]
-```
+$$
+\partial E(\theta)^\top \bar{y} \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)^\top \bar{y} ~ \nabla_\theta \log p(x_s | \theta)
+$$
 
 ### Variance reduction
 
-Since the REINFORCE estimator has high variance, it can be reduced by using a baseline [koolBuyREINFORCESamples2022](@citep).
-For $k > 1$ Monte-Carlo samples, we have
+The REINFORCE estimator has high variance, but its variance is reduced by subtracting a so-called baseline $b = \frac{1}{S} \sum_{s=1}^S f(x_s)$ [koolBuyREINFORCESamples2022](@citep).
 
-```math
+For $S > 1$ Monte-Carlo samples, we have
+
+$$
 \begin{aligned}
-\partial F(\theta) &\simeq \frac{1}{k}\sum_{i=1}^k f(x_k) \nabla_\theta\log p(x_k, \theta)^\top\\
-& \simeq \frac{1}{k}\sum_{i=1}^k \left(f(x_i) - \frac{1}{k - 1}\sum_{j\neq i} f(x_j)\right) \nabla_\theta\log p(x_i, \theta)^\top\\
-& = \frac{1}{k - 1}\sum_{i=1}^k \left(f(x_i) - \frac{1}{k}\sum_{j=1}^k f(x_j)\right) \nabla_\theta\log p(x_i, \theta)^\top
+\partial E(\theta)^\top \bar{y} 
+& \simeq \frac{1}{S} \sum_{s=1}^S \left(f(x_s) - \frac{1}{S - 1}\sum_{j\neq i} f(x_j) \right)^\top \bar{y} ~ \nabla_\theta\log p(x_s | \theta)\\
+& = \frac{1}{S - 1}\sum_{s=1}^S (f(x_s) - b)^\top \bar{y} ~ \nabla_\theta\log p(x_s | \theta)
 \end{aligned}
-```
-
-This gives the following vector-Jacobian product:
-
-```math
-\partial F(\theta)^\top v \simeq \frac{1}{k - 1}\sum_{i=1}^k \left(\left(f(x_i) - \frac{1}{k}\sum_{j=1}^k f(x_j)\right)^\top v\right) \nabla_\theta\log p(x_i, \theta)
-```
+$$
 
 ## Reparametrization
 
@@ -86,38 +77,90 @@ Implemented by [`Reparametrization`](@ref).
 
 ### Trick
 
-The reparametrization trick assumes that we can rewrite the random variable ``X \sim p(\theta)`` as ``X = g(Z, \theta)``, where ``Z \sim q`` is another random variable whose distribution does not depend on ``\theta``.
+The reparametrization trick assumes that we can rewrite the random variable $X \sim p(\theta)$ as $X = g_\theta(Z)$, where $Z \sim r$ is another random variable whose distribution $r$ does not depend on $\theta$.
 
-```math
-\begin{aligned}
-F(\theta + \varepsilon)
-& = \int f(g(z, \theta + \varepsilon)) ~ q(z) ~ \mathrm{d}z \\
-& \approx \int f\left(g(z, \theta) + \partial_\theta g(z, \theta) ~ \varepsilon\right) ~ q(z) ~ \mathrm{d}z \\
-& \approx F(\theta) + \int \partial f(g(z, \theta)) ~ \partial_\theta g(z, \theta) ~ \varepsilon ~ q(z) ~ \mathrm{d}z \\
-& \approx F(\theta) + \mathbb{E}_q \left[ \partial f(g(Z, \theta)) ~ \partial_\theta g(Z, \theta) \right] ~ \varepsilon \\
-\end{aligned}
-```
+The expectation is rewritten with $h = f \circ g$:
 
-If we denote ``h(z, \theta) = f(g(z, \theta))``, then we identify the Jacobian matrix:
+$$
+E(\theta) = \mathbb{E}\left[ f(g_\theta(Z)) \right] = \mathbb{E}\left[ h_\theta(Z) \right]
+$$
 
-```math
-\partial F(\theta) = \mathbb{E}_q \left[ \partial_\theta h(Z, \theta) \right]
-```
+And we can directly differentiate through the expectation:
 
-And the vector-Jacobian product:
+$$
+\partial E(\theta) = \mathbb{E} \left[ \partial_\theta h_\theta(Z) \right]
+$$
 
-```math
-\partial F(\theta)^\top v = \mathbb{E}_q \left[ \partial_\theta h(Z, \theta)^\top v \right]
-```
+This yields the VJP:
+
+$$
+\partial E(\theta)^\top \bar{y} = \mathbb{E} \left[ \partial_\theta h_\theta(Z)^\top \bar{y} \right]
+$$
+
+We can use a Monte-Carlo approximation with i.i.d. samples $z_1, \dots, z_S \sim r$:
+
+$$
+\partial E(\theta)^\top \bar{y} \simeq \frac{1}{S} \sum_{s=1}^S \partial_\theta h_\theta(z_s)^\top \bar{y}
+$$
 
 ### Catalogue
 
 The following reparametrizations are implemented:
 
-- Univariate Normal: ``X \sim \mathcal{N}(\mu, \sigma^2)`` is equivalent to ``X = \mu + \sigma Z`` with ``Z \sim \mathcal{N}(0, 1)``.
-- Multivariate Normal: ``X \sim \mathcal{N}(\mu, \Sigma)`` is equivalent to ``X = \mu + L Z`` with ``Z \sim \mathcal{N}(0, I)`` and ``L L^\top = \Sigma``. The matrix ``L`` can be obtained by Cholesky decomposition of ``\Sigma``.
+- Univariate Normal: $X \sim \mathcal{N}(\mu, \sigma^2)$ is equivalent to $X = \mu + \sigma Z$ with $Z \sim \mathcal{N}(0, 1)$.
+- Multivariate Normal: $X \sim \mathcal{N}(\mu, \Sigma)$ is equivalent to $X = \mu + L Z$ with $Z \sim \mathcal{N}(0, I)$ and $L L^\top = \Sigma$. The matrix $L$ can be obtained by Cholesky decomposition of $\Sigma$.
+
+## Probability gradients
+
+In addition to the expectation, we may also want gradients for individual output densities $q(y | \theta) = \mathbb{P}(f(X) = y)$.
+
+### REINFORCE probability gradients
+
+The REINFORCE technique can be applied in a similar way:
+
+$$
+q(y | \theta) = \mathbb{E}[\mathbf{1}\{f(X) = y\}]  = \int \mathbf{1} \{f(x) = y\} ~ p(x | \theta) ~ \mathrm{d}x
+$$
+
+Differentiating through the integral,
+
+$$
+\begin{aligned}
+\nabla_\theta q(y | \theta)
+& = \int \mathbf{1} \{f(x) = y\} ~ \nabla_\theta p(x | \theta) ~ \mathrm{d}x \\
+& = \mathbb{E} [\mathbf{1} \{f(X) = y\} ~ \nabla_\theta \log p(X | \theta)]
+\end{aligned}
+$$
+
+The Monte-Carlo approximation for this is
+
+$$
+\nabla_\theta q(y | \theta) \simeq \frac{1}{S} \sum_{s=1}^S \mathbf{1} \{f(x_s) = y\} ~ \nabla_\theta \log p(x_s | \theta)
+$$
+
+### Reparametrization probability gradients
+
+To leverage reparametrization, we perform a change of variables:
+
+$$
+q(y | \theta) = \mathbb{E}[\mathbf{1}\{h_\theta(Z) = y\}]  = \int \mathbf{1} \{h_\theta(z) = y\} ~ r(z) ~ \mathrm{d}z
+$$
+
+Assuming that $h_\theta$ is invertible, we take $z = h_\theta^{-1}(u)$ and
+
+$$
+\mathrm{d}z = |\partial h_{\theta}^{-1}(u)| ~ \mathrm{d}u
+$$
+
+so that
+
+$$
+q(y | \theta) = \int \mathbf{1} \{u = y\} ~ r(h_\theta^{-1}(u)) ~ |\partial h_{\theta}^{-1}(u)| ~ \mathrm{d}u
+$$
+
+We can now differentiate, but it gets tedious.
 
 ## Bibliography
 
-```@bibliography
-```
+$$@bibliography
+$$

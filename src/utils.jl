@@ -8,13 +8,9 @@ struct FixKwargs{F,K}
     kwargs::K
 end
 
-function (fk::FixKwargs)(args...)
-    return fk.f(args...; fk.kwargs...)
-end
+(fk::FixKwargs)(args...) = fk.f(args...; fk.kwargs...)
 
-function tmean(args...)
-    return treduce(+, args...) / length(first(args))
-end
+tmean(args...) = treduce(+, args...) / length(first(args))
 
 """
     maybe_eachcol(x::AbstractVector)
@@ -33,22 +29,27 @@ maybe_eachcol(x::AbstractMatrix) = eachcol(x)
 uniform_weights(x::AbstractArray) = ones(size(x)) ./ prod(size(x))
 
 """
-    tmap_or_map(::SomeType{threaded}, args...)
+    mymap(::Val{threaded}, args...)
 
 Apply either `tmap(args...)` or `map(args...)` depending on the value of `threaded`.
 """
-function tmap_or_map end
+mymap(::Val{true}, args...) = tmap(args...)
+mymap(::Val{false}, args...) = map(args...)
 
 """
-    tmapreduce_or_mapreduce(::SomeType{threaded}, args...)
+    mymapreduce(::Val{threaded}, args...)
 
 Apply either `tmapreduce(args...)` or `mapreduce(args...)` depending on the value of `threaded`.
 """
-function tmapreduce_or_mapreduce end
+mymapreduce(::Val{true}, args...) = tmapreduce(args...)
+mymapreduce(::Val{false}, args...) = mapreduce(args...)
 
 """
-    tmean_or_mean(::SomeType{threaded}, args...)
+    tmean_or_mean(::Val{threaded}, args...)
 
 Apply either `tmean(args...)` or `mean(args...)` depending on the value of `threaded`.
 """
-function tmean_or_mean end
+mymean(::Val{true}, args...) = tmean(args...)
+mymean(::Val{false}, args...) = mean(args...)
+
+unval(::Val{t}) where {t} = t
