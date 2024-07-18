@@ -61,12 +61,12 @@ Differentiable parametric expectation `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`
 ```jldoctest
 using DifferentiableExpectations, Distributions, Zygote
 
-F = Reparametrization(exp, Normal; nb_samples=10^4)
-F_true(μ, σ) = mean(LogNormal(μ, σ))
+E = Reparametrization(exp, Normal; nb_samples=10^4)
+E_true(μ, σ) = mean(LogNormal(μ, σ))
 
 μ, σ = 0.5, 1,0
-∇F, ∇F_true = gradient(F, μ, σ), gradient(F_true, μ, σ)
-isapprox(collect(∇F), collect(∇F_true); rtol=1e-1)
+∇E, ∇E_true = gradient(E, μ, σ), gradient(E_true, μ, σ)
+isapprox(collect(∇E), collect(∇E_true); rtol=1e-1)
 
 # output
 
@@ -92,8 +92,8 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct Reparametrization{threaded,F,D,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
-       DifferentiableExpectation{threaded}
+struct Reparametrization{t,F,D,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
+       DifferentiableExpectation{t}
     "function applied inside the expectation"
     f::F
     "constructor of the probability distribution `(θ...) -> p(θ)`"
@@ -104,13 +104,6 @@ struct Reparametrization{threaded,F,D,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
     nb_samples::Int
     "seed for the random number generator, reset before each call. Set to `nothing` for no seeding."
     seed::S
-end
-
-function Base.show(io::IO, rep::Reparametrization{threaded}) where {threaded}
-    (; f, dist_constructor, rng, nb_samples) = rep
-    return print(
-        io, "Reparametrization{$threaded}($f, $dist_constructor, $rng, $nb_samples)"
-    )
 end
 
 function Reparametrization(
@@ -124,46 +117,36 @@ function Reparametrization(
     return Reparametrization{threaded,F,D,R,S}(f, dist_constructor, rng, nb_samples, seed)
 end
 
-function ChainRulesCore.rrule(
-    rc::RuleConfig, F::Reparametrization{threaded}, θ...; kwargs...
-) where {threaded}
+function ChainRulesCore.rrule(rc::RuleConfig, E::Reparametrization, θ...; kwargs...)
     project_θ = ProjectTo(θ)
 
-    (; f, dist_constructor, rng, nb_samples) = F
+    (; f, dist_constructor, rng, nb_samples) = E
     dist = dist_constructor(θ...)
     transformed_dist = reparametrize(dist)
     zs = maybe_eachcol(rand(rng, transformed_dist.base_dist, nb_samples))
-    xs = if threaded
-        tmap(transformed_dist.transformation, zs)
-    else
-        map(transformed_dist.transformation, zs)
-    end
-    ys = samples_from_presamples(F, xs; kwargs...)
+    zdist = FixedAtomsProbabilityDistribution(zs; threaded=unval(is_threaded(E)))
+    xdist = map(transformed_dist.transformation, zdist)
+    fk = FixKwargs(f, kwargs)
+    ydist = map(fk, xdist)
+    y = mean(ydist)
 
-    function h(z, θ)
+    function h(zᵢ, θ)
         transformed_dist = reparametrize(dist_constructor(θ...))
-        return f(transformed_dist.transformation(z); kwargs...)
+        return f(transformed_dist.transformation(zᵢ); kwargs...)
     end
 
-    function pullback_Reparametrization(dy_thunked)
-        dy = unthunk(dy_thunked)
-        dF = @not_implemented(
-            "The fields of the `Reparametrization` object are considered constant."
-        )
-        function _single_sample_pullback(z)
-            _, pb = rrule_via_ad(rc, h, z, θ)
-            _, _, dθ = pb(dy)
-            return dθ
+    function pullback_Reparametrization(Δy_thunked)
+        Δy = unthunk(Δy_thunked)
+        ΔE = @not_implemented("The fields of the `Reparametrization` object are constant.")
+        function _single_sample_pullback(zᵢ)
+            _, pb = rrule_via_ad(rc, h, zᵢ, θ)
+            _, _, Δθ = pb(Δy)
+            return Δθ
         end
-        dθ = if threaded
-            tmapreduce(_single_sample_pullback, .+, zs) ./ nb_samples
-        else
-            mapreduce(_single_sample_pullback, .+, zs) ./ nb_samples
-        end
-        dθ_proj = project_θ(dθ)
-        return (dF, dθ_proj...)
+        Δθ = mymapreduce(is_threaded(E), _single_sample_pullback, .+, zs) ./ nb_samples
+        Δθ_proj = project_θ(Δθ)
+        return (ΔE, Δθ_proj...)
     end
 
-    y = threaded ? tmean(ys) : mean(ys)
     return y, pullback_Reparametrization
 end

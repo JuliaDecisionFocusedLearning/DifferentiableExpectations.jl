@@ -11,12 +11,12 @@ Differentiable parametric expectation `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`
 ```jldoctest
 using DifferentiableExpectations, Distributions, Zygote
 
-F = Reinforce(exp, Normal; nb_samples=10^5)
-F_true(μ, σ) = mean(LogNormal(μ, σ))
+E = Reinforce(exp, Normal; nb_samples=10^5)
+E_true(μ, σ) = mean(LogNormal(μ, σ))
 
 μ, σ = 0.5, 1,0
-∇F, ∇F_true = gradient(F, μ, σ), gradient(F_true, μ, σ)
-isapprox(collect(∇F), collect(∇F_true); rtol=1e-1)
+∇E, ∇E_true = gradient(E, μ, σ), gradient(E_true, μ, σ)
+isapprox(collect(∇E), collect(∇E_true); rtol=1e-1)
 
 # output
 
@@ -43,8 +43,8 @@ $(TYPEDFIELDS)
 
 - [`DifferentiableExpectation`](@ref)
 """
-struct Reinforce{threaded,variance_reduction,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
-       DifferentiableExpectation{threaded}
+struct Reinforce{t,variance_reduction,F,D,G,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
+       DifferentiableExpectation{t}
     "function applied inside the expectation"
     f::F
     "constructor of the probability distribution `(θ...) -> p(θ)`"
@@ -57,16 +57,6 @@ struct Reinforce{threaded,variance_reduction,F,D,G,R<:AbstractRNG,S<:Union{Int,N
     nb_samples::Int
     "seed for the random number generator, reset before each call. Set to `nothing` for no seeding."
     seed::S
-end
-
-function Base.show(
-    io::IO, rep::Reinforce{threaded,variance_reduction}
-) where {threaded,variance_reduction}
-    (; f, dist_constructor, dist_logdensity_grad, rng, nb_samples) = rep
-    return print(
-        io,
-        "Reinforce{$threaded,$variance_reduction}($f, $dist_constructor, $dist_logdensity_grad, $rng, $nb_samples)",
-    )
 end
 
 function Reinforce(
@@ -84,10 +74,8 @@ function Reinforce(
     )
 end
 
-function dist_logdensity_grad(
-    rc::RuleConfig, F::Reinforce{threaded}, x, θ...
-) where {threaded}
-    (; dist_constructor, dist_logdensity_grad) = F
+function dist_logdensity_grad(rc::RuleConfig, E::Reinforce, x, θ...)
+    (; dist_constructor, dist_logdensity_grad) = E
     if !isnothing(dist_logdensity_grad)
         dθ = dist_logdensity_grad(x, θ...)
     else
@@ -99,43 +87,65 @@ function dist_logdensity_grad(
 end
 
 function ChainRulesCore.rrule(
-    rc::RuleConfig, F::Reinforce{threaded,variance_reduction}, θ...; kwargs...
-) where {threaded,variance_reduction}
+    rc::RuleConfig, E::Reinforce{t,variance_reduction}, θ...; kwargs...
+) where {t,variance_reduction}
     project_θ = ProjectTo(θ)
 
-    (; nb_samples) = F
-    xs = presamples(F, θ...)
-    ys = samples_from_presamples(F, xs; kwargs...)
-    y = threaded ? tmean(ys) : mean(ys)
+    (; f, nb_samples) = E
+    xdist = empirical_predistribution(E, θ...)
+    xs = atoms(xdist)
+    fk = FixKwargs(f, kwargs)
+    ydist = map(fk, xdist)
+    ys = atoms(ydist)
+    y = mean(ydist)
 
-    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
-    gs = if threaded
-        tmap(_dist_logdensity_grad_partial, xs)
-    else
-        map(_dist_logdensity_grad_partial, xs)
-    end
+    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, E, x, θ...)
+    gs = mymap(is_threaded(E), _dist_logdensity_grad_partial, xs)
 
-    ys_with_baseline = if (variance_reduction && nb_samples > 1)
-        map(yi -> yi .- y, ys)
+    ys_baseline = if (variance_reduction && nb_samples > 1)
+        mymap(is_threaded(E), yᵢ -> yᵢ .- y, ys)
     else
         ys
     end
-    K = nb_samples - (variance_reduction && nb_samples > 1)
+    adjusted_nb_samples = nb_samples - (variance_reduction && nb_samples > 1)
 
-    function pullback_Reinforce(dy_thunked)
-        dy = unthunk(dy_thunked)
-        dF = @not_implemented(
-            "The fields of the `Reinforce` object are considered constant."
-        )
-        _single_sample_pullback(g, y) = g .* dot(y, dy)
-        dθ = if threaded
-            tmapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
-        else
-            mapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
-        end
-        dθ_proj = project_θ(dθ)
-        return (dF, dθ_proj...)
+    function pullback_Reinforce(Δy_thunked)
+        Δy = unthunk(Δy_thunked)
+        ΔE = @not_implemented("The fields of the `Reinforce` object are constant.")
+        _single_sample_pullback(gᵢ, yᵢ) = gᵢ .* dot(yᵢ, Δy)
+        Δθ =
+            mymapreduce(is_threaded(E), _single_sample_pullback, .+, gs, ys_baseline) ./
+            adjusted_nb_samples
+        Δθ_proj = project_θ(Δθ)
+        return (ΔE, Δθ_proj...)
     end
 
     return y, pullback_Reinforce
+end
+
+function ChainRulesCore.rrule(
+    rc::RuleConfig, ::typeof(empirical_distribution), E::Reinforce, θ...; kwargs...
+)
+    project_θ = ProjectTo(θ)
+
+    (; f, nb_samples) = E
+    xdist = empirical_predistribution(E, θ...)
+    xs = atoms(xdist)
+    fk = FixKwargs(f, kwargs)
+    ydist = map(fk, xdist)
+
+    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, E, x, θ...)
+    gs = mymap(is_threaded(E), _dist_logdensity_grad_partial, xs)
+
+    function pullback_Reinforce_probadist(Δdist_thunked)
+        Δdist = unthunk(Δdist_thunked)
+        Δps = Δdist.weights
+        ΔE = @not_implemented("The fields of the `Reinforce` object are constant.")
+        _single_sample_pullback(gᵢ, Δpᵢ) = gᵢ .* Δpᵢ
+        Δθ = mymapreduce(is_threaded(E), _single_sample_pullback, .+, gs, Δps) ./ nb_samples
+        Δθ_proj = project_θ(Δθ)
+        return (NoTangent(), ΔE, Δθ_proj...)
+    end
+
+    return ydist, pullback_Reinforce_probadist
 end

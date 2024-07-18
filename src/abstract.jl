@@ -1,7 +1,7 @@
 """
-    DifferentiableExpectation{threaded}
+    DifferentiableExpectation{t}
 
-Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`, whose value and derivative are approximated with Monte-Carlo averages.
+Abstract supertype for differentiable parametric expectations `E : θ -> 𝔼[f(X)]` where `X ∼ p(θ)`, whose value and derivative are approximated with Monte-Carlo averages.
 
 # Subtypes
 
@@ -10,9 +10,9 @@ Abstract supertype for differentiable parametric expectations `F : θ -> 𝔼[f(
 
 # Calling behavior
 
-    (F::DifferentiableExpectation)(θ...; kwargs...)
+    (E::DifferentiableExpectation)(θ...; kwargs...)
 
-Return a Monte-Carlo average `(1/s) ∑f(xᵢ)` where the `xᵢ ∼ p(θ)` are iid samples.
+Return a Monte-Carlo average `(1/S) ∑f(xᵢ)` where the `xᵢ ∼ p(θ)` are iid samples.
 
 # Type parameters
 
@@ -32,49 +32,37 @@ The resulting object `dist` needs to satisfy:
   - the [Random API](https://docs.julialang.org/en/v1/stdlib/Random/#Hooking-into-the-Random-API) for sampling with `rand(rng, dist)`
   - the [DensityInterface.jl API](https://github.com/JuliaMath/DensityInterface.jl) for loglikelihoods with `logdensityof(dist, x)`
 """
-abstract type DifferentiableExpectation{threaded} end
+abstract type DifferentiableExpectation{t} end
+
+is_threaded(::DifferentiableExpectation{t}) where {t} = Val(t)
 
 """
-    presamples(F::DifferentiableExpectation, θ...)
+    empirical_predistribution(E::DifferentiableExpectation, θ...)
 
-Return a vector `[x₁, ..., xₛ]` or matrix `[x₁ ... xₛ]` where the `xᵢ ∼ p(θ)` are iid samples.
+Return a uniform [`FixedAtomsProbabilityDistribution`](@ref) over `{x₁, ..., xₛ}`, where the `xᵢ ∼ p(θ)` are iid samples.
 """
-function presamples(F::DifferentiableExpectation, θ...)
-    (; dist_constructor, rng, nb_samples, seed) = F
+function empirical_predistribution(E::DifferentiableExpectation, θ...)
+    (; dist_constructor, rng, nb_samples, seed) = E
     dist = dist_constructor(θ...)
     isnothing(seed) || seed!(rng, seed)
     xs = maybe_eachcol(rand(rng, dist, nb_samples))
-    return xs
+    xdist = FixedAtomsProbabilityDistribution(xs; threaded=unval(is_threaded(E)))
+    return xdist
 end
 
 """
-    samples(F::DifferentiableExpectation, θ...; kwargs...)
+    empirical_distribution(E::DifferentiableExpectation, θ...; kwargs...)
 
-Return a vector `[f(x₁), ..., f(xₛ)]` where the `xᵢ ∼ p(θ)` are iid samples.
+Return a uniform [`FixedAtomsProbabilityDistribution`](@ref) over `{f(x₁), ..., f(xₛ)}`, where the `xᵢ ∼ p(θ)` are iid samples.
 """
-function samples(F::DifferentiableExpectation{threaded}, θ...; kwargs...) where {threaded}
-    xs = presamples(F, θ...)
-    return samples_from_presamples(F, xs; kwargs...)
+function empirical_distribution(E::DifferentiableExpectation, θ...; kwargs...)
+    xdist = empirical_predistribution(E, θ...)
+    fk = FixKwargs(E.f, kwargs)
+    ydist = map(fk, xdist)
+    return ydist
 end
 
-function samples_from_presamples(
-    F::DifferentiableExpectation{threaded}, xs::AbstractVector; kwargs...
-) where {threaded}
-    (; f) = F
-    fk = FixKwargs(f, kwargs)
-    if threaded
-        return tmap(fk, xs)
-    else
-        return map(fk, xs)
-    end
-end
-
-function (F::DifferentiableExpectation{threaded})(θ...; kwargs...) where {threaded}
-    ys = samples(F, θ...; kwargs...)
-    y = if threaded
-        tmean(ys)
-    else
-        mean(ys)
-    end
-    return y
+function (E::DifferentiableExpectation)(θ...; kwargs...)
+    ydist = empirical_distribution(E, θ...; kwargs...)
+    return mean(ydist)
 end

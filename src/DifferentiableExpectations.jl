@@ -19,6 +19,7 @@ using ChainRulesCore:
     rrule,
     rrule_via_ad,
     unthunk
+using Compat: @compat
 using DensityInterface: logdensityof
 using Distributions: Distribution, MvNormal, Normal
 using DocStringExtensions
@@ -29,14 +30,17 @@ using Statistics: Statistics, cov, mean, std
 using StatsBase: StatsBase
 
 include("utils.jl")
+include("distribution.jl")
 include("abstract.jl")
 include("reinforce.jl")
 include("reparametrization.jl")
-include("distribution.jl")
 
 export DifferentiableExpectation
 export Reinforce
 export Reparametrization
 export FixedAtomsProbabilityDistribution
+export empirical_distribution
+
+@compat public atoms, weights
 
 end # module DifferentiableExpectations
