@@ -5,23 +5,17 @@ Most of the math below is taken from [mohamedMonteCarloGradient2020](@citet).
 Consider a function $f: \mathbb{R}^n \to \mathbb{R}^m$, a parameter $\theta \in \mathbb{R}^d$ and a parametric probability distribution $p(\theta)$ on the input space.
 Given a random variable $X \sim p(\theta)$, we want to differentiate the expectation of $Y = f(X)$ with respect to $\theta$:
 
-$$
-E(\theta) = \mathbb{E}[f(X)] = \int f(x) ~ p(x | \theta) ~\mathrm{d} x
-$$
+$$E(\theta) = \mathbb{E}[f(X)] = \int f(x) ~ p(x | \theta) ~\mathrm{d} x$$
 
 Usually this is approximated with Monte-Carlo sampling: let $x_1, \dots, x_S \sim p(\theta)$ be i.i.d., we have the estimator
 
-$$
-E(\theta) \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)
-$$
+$$E(\theta) \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)$$
 
 ## Autodiff
 
 Since $E$ is a vector-to-vector function, the key quantity we want to compute is its Jacobian matrix $\partial E(\theta) \in \mathbb{R}^{m \times n}$:
 
-$$
-\partial E(\theta) = \int y ~ \nabla_\theta q(y | \theta)^\top ~ \mathrm{d} y = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~\mathrm{d} x
-$$
+$$\partial E(\theta) = \int y ~ \nabla_\theta q(y | \theta)^\top ~ \mathrm{d} y = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~\mathrm{d} x$$
 
 However, to implement automatic differentiation, we only need the vector-Jacobian product (VJP) $\partial E(\theta)^\top \bar{y}$ with an output cotangent $\bar{y} \in \mathbb{R}^m$.
 See the book by [blondelElementsDifferentiableProgramming2024](@citet) to know more.
@@ -36,26 +30,20 @@ Implemented by [`Reinforce`](@ref).
 
 The REINFORCE estimator is derived with the help of the identity $\nabla \log u = \nabla u / u$:
 
-$$
-\begin{aligned}
+$$\begin{aligned}
 \partial E(\theta)
 & = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~ \mathrm{d}x \\
 & = \int f(x) ~ p(x | \theta) \nabla_\theta \log p(x | \theta)^\top ~ \mathrm{d}x \\
 & = \mathbb{E} \left[f(X) \nabla_\theta \log p(X | \theta)^\top\right] \\
-\end{aligned}
-$$
+\end{aligned}$$
 
 And the VJP:
 
-$$
-\partial E(\theta)^\top \bar{y} = \mathbb{E} \left[f(X)^\top \bar{y} ~\nabla_\theta \log p(X | \theta)\right]
-$$
+$$\partial E(\theta)^\top \bar{y} = \mathbb{E} \left[f(X)^\top \bar{y} ~\nabla_\theta \log p(X | \theta)\right]$$
 
 Our Monte-Carlo approximation will therefore be:
 
-$$
-\partial E(\theta)^\top \bar{y} \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)^\top \bar{y} ~ \nabla_\theta \log p(x_s | \theta)
-$$
+$$\partial E(\theta)^\top \bar{y} \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)^\top \bar{y} ~ \nabla_\theta \log p(x_s | \theta)$$
 
 ### Variance reduction
 
@@ -63,13 +51,11 @@ The REINFORCE estimator has high variance, but its variance is reduced by subtra
 
 For $S > 1$ Monte-Carlo samples, we have
 
-$$
-\begin{aligned}
+$$\begin{aligned}
 \partial E(\theta)^\top \bar{y} 
 & \simeq \frac{1}{S} \sum_{s=1}^S \left(f(x_s) - \frac{1}{S - 1}\sum_{j\neq i} f(x_j) \right)^\top \bar{y} ~ \nabla_\theta\log p(x_s | \theta)\\
 & = \frac{1}{S - 1}\sum_{s=1}^S (f(x_s) - b)^\top \bar{y} ~ \nabla_\theta\log p(x_s | \theta)
-\end{aligned}
-$$
+\end{aligned}$$
 
 ## Reparametrization
 
@@ -81,27 +67,19 @@ The reparametrization trick assumes that we can rewrite the random variable $X \
 
 The expectation is rewritten with $h = f \circ g$:
 
-$$
-E(\theta) = \mathbb{E}\left[ f(g_\theta(Z)) \right] = \mathbb{E}\left[ h_\theta(Z) \right]
-$$
+$$E(\theta) = \mathbb{E}\left[ f(g_\theta(Z)) \right] = \mathbb{E}\left[ h_\theta(Z) \right]$$
 
 And we can directly differentiate through the expectation:
 
-$$
-\partial E(\theta) = \mathbb{E} \left[ \partial_\theta h_\theta(Z) \right]
-$$
+$$\partial E(\theta) = \mathbb{E} \left[ \partial_\theta h_\theta(Z) \right]$$
 
 This yields the VJP:
 
-$$
-\partial E(\theta)^\top \bar{y} = \mathbb{E} \left[ \partial_\theta h_\theta(Z)^\top \bar{y} \right]
-$$
+$$\partial E(\theta)^\top \bar{y} = \mathbb{E} \left[ \partial_\theta h_\theta(Z)^\top \bar{y} \right]$$
 
 We can use a Monte-Carlo approximation with i.i.d. samples $z_1, \dots, z_S \sim r$:
 
-$$
-\partial E(\theta)^\top \bar{y} \simeq \frac{1}{S} \sum_{s=1}^S \partial_\theta h_\theta(z_s)^\top \bar{y}
-$$
+$$\partial E(\theta)^\top \bar{y} \simeq \frac{1}{S} \sum_{s=1}^S \partial_\theta h_\theta(z_s)^\top \bar{y}$$
 
 ### Catalogue
 
@@ -118,49 +96,37 @@ In addition to the expectation, we may also want gradients for individual output
 
 The REINFORCE technique can be applied in a similar way:
 
-$$
-q(y | \theta) = \mathbb{E}[\mathbf{1}\{f(X) = y\}]  = \int \mathbf{1} \{f(x) = y\} ~ p(x | \theta) ~ \mathrm{d}x
-$$
+$$q(y | \theta) = \mathbb{E}[\mathbf{1}\{f(X) = y\}]  = \int \mathbf{1} \{f(x) = y\} ~ p(x | \theta) ~ \mathrm{d}x$$
 
 Differentiating through the integral,
 
-$$
-\begin{aligned}
+$$\begin{aligned}
 \nabla_\theta q(y | \theta)
 & = \int \mathbf{1} \{f(x) = y\} ~ \nabla_\theta p(x | \theta) ~ \mathrm{d}x \\
 & = \mathbb{E} [\mathbf{1} \{f(X) = y\} ~ \nabla_\theta \log p(X | \theta)]
-\end{aligned}
-$$
+\end{aligned}$$
 
 The Monte-Carlo approximation for this is
 
-$$
-\nabla_\theta q(y | \theta) \simeq \frac{1}{S} \sum_{s=1}^S \mathbf{1} \{f(x_s) = y\} ~ \nabla_\theta \log p(x_s | \theta)
-$$
+$$\nabla_\theta q(y | \theta) \simeq \frac{1}{S} \sum_{s=1}^S \mathbf{1} \{f(x_s) = y\} ~ \nabla_\theta \log p(x_s | \theta)$$
 
 ### Reparametrization probability gradients
 
 To leverage reparametrization, we perform a change of variables:
 
-$$
-q(y | \theta) = \mathbb{E}[\mathbf{1}\{h_\theta(Z) = y\}]  = \int \mathbf{1} \{h_\theta(z) = y\} ~ r(z) ~ \mathrm{d}z
-$$
+$$q(y | \theta) = \mathbb{E}[\mathbf{1}\{h_\theta(Z) = y\}]  = \int \mathbf{1} \{h_\theta(z) = y\} ~ r(z) ~ \mathrm{d}z$$
 
 Assuming that $h_\theta$ is invertible, we take $z = h_\theta^{-1}(u)$ and
 
-$$
-\mathrm{d}z = |\partial h_{\theta}^{-1}(u)| ~ \mathrm{d}u
-$$
+$$\mathrm{d}z = |\partial h_{\theta}^{-1}(u)| ~ \mathrm{d}u$$
 
 so that
 
-$$
-q(y | \theta) = \int \mathbf{1} \{u = y\} ~ r(h_\theta^{-1}(u)) ~ |\partial h_{\theta}^{-1}(u)| ~ \mathrm{d}u
-$$
+$$q(y | \theta) = \int \mathbf{1} \{u = y\} ~ r(h_\theta^{-1}(u)) ~ |\partial h_{\theta}^{-1}(u)| ~ \mathrm{d}u$$
 
 We can now differentiate, but it gets tedious.
 
 ## Bibliography
 
-$$@bibliography
-$$
+```@bibliography
+```
