@@ -65,7 +65,7 @@ normal_logdensity_grad(x, θ...) = gradient((_θ...) -> logpdf(Normal(_θ...), x
 end;
 
 @testset verbose = true "Multivariate LogNormal" begin
-    μ, σ = [2.0, 3.0], [1.0, 0.5]
+    μ, σ = [2.0, 3.0], [0.2, 0.3]
     true_mean(μ, σ) = mean.(LogNormal.(μ, σ))
     true_std(μ, σ) = std.(LogNormal.(μ, σ))
     ∂mean_true = jacobian(true_mean, μ, σ)
@@ -112,4 +112,15 @@ end
 
     @test var(first.(grads)) < var(first.(grads_no_vr))
     @test var(last.(grads)) < var(last.(grads_no_vr))
+end
+
+@testset "Reinforce proba dist rule" begin
+    μ, σ = 0.5, 1.0
+    seed = 63
+    r = Reinforce(
+        exp, Normal; nb_samples=100, variance_reduction=false, rng=StableRNG(seed), seed=0
+    )
+    r_split(θ...) = mean(empirical_distribution(r, θ...))
+    @test r(μ, σ) == r_split(μ, σ)
+    @test gradient(r, μ, σ) == gradient(r_split, μ, σ)
 end

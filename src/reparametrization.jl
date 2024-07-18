@@ -130,24 +130,22 @@ function ChainRulesCore.rrule(rc::RuleConfig, E::Reparametrization, θ...; kwarg
     ydist = map(fk, xdist)
     y = mean(ydist)
 
-    function h(z, θ)
+    function h(zᵢ, θ)
         transformed_dist = reparametrize(dist_constructor(θ...))
-        return f(transformed_dist.transformation(z); kwargs...)
+        return f(transformed_dist.transformation(zᵢ); kwargs...)
     end
 
-    function pullback_Reparametrization(dy_thunked)
-        dy = unthunk(dy_thunked)
-        dF = @not_implemented(
-            "The fields of the `Reparametrization` object are considered constant."
-        )
-        function _single_sample_pullback(z)
-            _, pb = rrule_via_ad(rc, h, z, θ)
-            _, _, dθ = pb(dy)
-            return dθ
+    function pullback_Reparametrization(Δy_thunked)
+        Δy = unthunk(Δy_thunked)
+        ΔE = @not_implemented("The fields of the `Reparametrization` object are constant.")
+        function _single_sample_pullback(zᵢ)
+            _, pb = rrule_via_ad(rc, h, zᵢ, θ)
+            _, _, Δθ = pb(Δy)
+            return Δθ
         end
-        dθ = mymapreduce(is_threaded(E), _single_sample_pullback, .+, zs) ./ nb_samples
-        dθ_proj = project_θ(dθ)
-        return (dF, dθ_proj...)
+        Δθ = mymapreduce(is_threaded(E), _single_sample_pullback, .+, zs) ./ nb_samples
+        Δθ_proj = project_θ(Δθ)
+        return (ΔE, Δθ_proj...)
     end
 
     return y, pullback_Reparametrization

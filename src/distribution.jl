@@ -124,7 +124,8 @@ end
 function ChainRulesCore.rrule(::typeof(mean), dist::FixedAtomsProbabilityDistribution)
     (; atoms) = dist
     e = mean(dist)
-    function dist_mean_pullback(Δe)
+    function dist_mean_pullback(Δe_thunked)
+        Δe = unthunk(Δe_thunked)
         Δatoms = NoTangent()
         Δweights = mymap(is_threaded(dist), Base.Fix1(dot, Δe), atoms)
         Δdist = Tangent{FixedAtomsProbabilityDistribution}(; atoms=Δatoms, weights=Δweights)
@@ -137,7 +138,8 @@ function ChainRulesCore.rrule(::typeof(mean), f, dist::FixedAtomsProbabilityDist
     new_dist = map(f, dist)
     new_atoms = new_dist.atoms
     e = mean(new_dist)
-    function dist_fmean_pullback(Δe)
+    function dist_fmean_pullback(Δe_thunked)
+        Δe = unthunk(Δe_thunked)
         Δatoms = NoTangent()
         Δweights = mymap(is_threaded(dist), Base.Fix1(dot, Δe), new_atoms)
         Δdist = Tangent{FixedAtomsProbabilityDistribution}(; atoms=Δatoms, weights=Δweights)

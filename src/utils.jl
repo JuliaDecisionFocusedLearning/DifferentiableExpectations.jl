@@ -10,8 +10,6 @@ end
 
 (fk::FixKwargs)(args...) = fk.f(args...; fk.kwargs...)
 
-tmean(args...) = treduce(+, args...) / length(first(args))
-
 """
     maybe_eachcol(x::AbstractVector)
 
@@ -43,13 +41,5 @@ Apply either `tmapreduce(args...)` or `mapreduce(args...)` depending on the valu
 """
 mymapreduce(::Val{true}, args...) = tmapreduce(args...)
 mymapreduce(::Val{false}, args...) = mapreduce(args...)
-
-"""
-    tmean_or_mean(::Val{threaded}, args...)
-
-Apply either `tmean(args...)` or `mean(args...)` depending on the value of `threaded`.
-"""
-mymean(::Val{true}, args...) = tmean(args...)
-mymean(::Val{false}, args...) = mean(args...)
 
 unval(::Val{t}) where {t} = t

@@ -102,26 +102,50 @@ function ChainRulesCore.rrule(
     _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, E, x, θ...)
     gs = mymap(is_threaded(E), _dist_logdensity_grad_partial, xs)
 
-    ys_with_baseline = if (variance_reduction && nb_samples > 1)
-        mymap(is_threaded(E), yi -> yi .- y, ys)
+    ys_baseline = if (variance_reduction && nb_samples > 1)
+        mymap(is_threaded(E), yᵢ -> yᵢ .- y, ys)
     else
         ys
     end
-    K = nb_samples - (variance_reduction && nb_samples > 1)
+    adjusted_nb_samples = nb_samples - (variance_reduction && nb_samples > 1)
 
-    function pullback_Reinforce(dy_thunked)
-        dy = unthunk(dy_thunked)
-        dF = @not_implemented(
-            "The fields of the `Reinforce` object are considered constant."
-        )
-        _single_sample_pullback(g, y) = g .* dot(y, dy)
-        dθ =
-            mymapreduce(
-                is_threaded(E), _single_sample_pullback, .+, gs, ys_with_baseline
-            ) ./ K
-        dθ_proj = project_θ(dθ)
-        return (dF, dθ_proj...)
+    function pullback_Reinforce(Δy_thunked)
+        Δy = unthunk(Δy_thunked)
+        ΔE = @not_implemented("The fields of the `Reinforce` object are constant.")
+        _single_sample_pullback(gᵢ, yᵢ) = gᵢ .* dot(yᵢ, Δy)
+        Δθ =
+            mymapreduce(is_threaded(E), _single_sample_pullback, .+, gs, ys_baseline) ./
+            adjusted_nb_samples
+        Δθ_proj = project_θ(Δθ)
+        return (ΔE, Δθ_proj...)
     end
 
     return y, pullback_Reinforce
+end
+
+function ChainRulesCore.rrule(
+    rc::RuleConfig, ::typeof(empirical_distribution), E::Reinforce, θ...; kwargs...
+)
+    project_θ = ProjectTo(θ)
+
+    (; f, nb_samples) = E
+    xdist = empirical_predistribution(E, θ...)
+    xs = atoms(xdist)
+    fk = FixKwargs(f, kwargs)
+    ydist = map(fk, xdist)
+
+    _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, E, x, θ...)
+    gs = mymap(is_threaded(E), _dist_logdensity_grad_partial, xs)
+
+    function pullback_Reinforce_probadist(Δdist_thunked)
+        Δdist = unthunk(Δdist_thunked)
+        Δps = Δdist.weights
+        ΔE = @not_implemented("The fields of the `Reinforce` object are constant.")
+        _single_sample_pullback(gᵢ, Δpᵢ) = gᵢ .* Δpᵢ
+        Δθ = mymapreduce(is_threaded(E), _single_sample_pullback, .+, gs, Δps) ./ nb_samples
+        Δθ_proj = project_θ(Δθ)
+        return (NoTangent(), ΔE, Δθ_proj...)
+    end
+
+    return ydist, pullback_Reinforce_probadist
 end
