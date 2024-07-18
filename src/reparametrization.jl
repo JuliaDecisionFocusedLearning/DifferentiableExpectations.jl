@@ -106,13 +106,6 @@ struct Reparametrization{threaded,F,D,R<:AbstractRNG,S<:Union{Int,Nothing}} <:
     seed::S
 end
 
-function Base.show(io::IO, rep::Reparametrization{threaded}) where {threaded}
-    (; f, dist_constructor, rng, nb_samples) = rep
-    return print(
-        io, "Reparametrization{$threaded}($f, $dist_constructor, $rng, $nb_samples)"
-    )
-end
-
 function Reparametrization(
     f::F,
     dist_constructor::D;
@@ -124,20 +117,14 @@ function Reparametrization(
     return Reparametrization{threaded,F,D,R,S}(f, dist_constructor, rng, nb_samples, seed)
 end
 
-function ChainRulesCore.rrule(
-    rc::RuleConfig, F::Reparametrization{threaded}, θ...; kwargs...
-) where {threaded}
+function ChainRulesCore.rrule(rc::RuleConfig, F::Reparametrization, θ...; kwargs...)
     project_θ = ProjectTo(θ)
 
     (; f, dist_constructor, rng, nb_samples) = F
     dist = dist_constructor(θ...)
     transformed_dist = reparametrize(dist)
     zs = maybe_eachcol(rand(rng, transformed_dist.base_dist, nb_samples))
-    xs = if threaded
-        tmap(transformed_dist.transformation, zs)
-    else
-        map(transformed_dist.transformation, zs)
-    end
+    xs = tmap_or_map(F, transformed_dist.transformation, zs)
     ys = samples_from_presamples(F, xs; kwargs...)
 
     function h(z, θ)
@@ -155,15 +142,11 @@ function ChainRulesCore.rrule(
             _, _, dθ = pb(dy)
             return dθ
         end
-        dθ = if threaded
-            tmapreduce(_single_sample_pullback, .+, zs) ./ nb_samples
-        else
-            mapreduce(_single_sample_pullback, .+, zs) ./ nb_samples
-        end
+        dθ = tmapreduce_or_mapreduce(F, _single_sample_pullback, .+, zs) ./ nb_samples
         dθ_proj = project_θ(dθ)
         return (dF, dθ_proj...)
     end
 
-    y = threaded ? tmean(ys) : mean(ys)
+    y = tmean_or_mean(F, ys)
     return y, pullback_Reparametrization
 end

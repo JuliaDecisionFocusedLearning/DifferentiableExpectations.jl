@@ -59,16 +59,6 @@ struct Reinforce{threaded,variance_reduction,F,D,G,R<:AbstractRNG,S<:Union{Int,N
     seed::S
 end
 
-function Base.show(
-    io::IO, rep::Reinforce{threaded,variance_reduction}
-) where {threaded,variance_reduction}
-    (; f, dist_constructor, dist_logdensity_grad, rng, nb_samples) = rep
-    return print(
-        io,
-        "Reinforce{$threaded,$variance_reduction}($f, $dist_constructor, $dist_logdensity_grad, $rng, $nb_samples)",
-    )
-end
-
 function Reinforce(
     f::F,
     dist_constructor::D,
@@ -106,17 +96,13 @@ function ChainRulesCore.rrule(
     (; nb_samples) = F
     xs = presamples(F, θ...)
     ys = samples_from_presamples(F, xs; kwargs...)
-    y = threaded ? tmean(ys) : mean(ys)
+    y = tmean_or_mean(F, ys)
 
     _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, F, x, θ...)
-    gs = if threaded
-        tmap(_dist_logdensity_grad_partial, xs)
-    else
-        map(_dist_logdensity_grad_partial, xs)
-    end
+    gs = tmap_or_map(F, _dist_logdensity_grad_partial, xs)
 
     ys_with_baseline = if (variance_reduction && nb_samples > 1)
-        map(yi -> yi .- y, ys)
+        tmap_or_map(F, yi -> yi .- y, ys)
     else
         ys
     end
@@ -128,11 +114,9 @@ function ChainRulesCore.rrule(
             "The fields of the `Reinforce` object are considered constant."
         )
         _single_sample_pullback(g, y) = g .* dot(y, dy)
-        dθ = if threaded
-            tmapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
-        else
-            mapreduce(_single_sample_pullback, .+, gs, ys_with_baseline) ./ K
-        end
+        dθ =
+            tmapreduce_or_mapreduce(F, _single_sample_pullback, .+, gs, ys_with_baseline) ./
+            K
         dθ_proj = project_θ(dθ)
         return (dF, dθ_proj...)
     end

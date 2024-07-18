@@ -29,10 +29,10 @@ using Statistics: Statistics, cov, mean, std
 using StatsBase: StatsBase
 
 include("utils.jl")
+include("distribution.jl")
 include("abstract.jl")
 include("reinforce.jl")
 include("reparametrization.jl")
-include("distribution.jl")
 
 export DifferentiableExpectation
 export Reinforce

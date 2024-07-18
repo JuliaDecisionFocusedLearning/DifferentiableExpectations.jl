@@ -34,6 +34,15 @@ The resulting object `dist` needs to satisfy:
 """
 abstract type DifferentiableExpectation{threaded} end
 
+tmap_or_map(::DifferentiableExpectation{true}, args...) = tmap(args...)
+tmap_or_map(::DifferentiableExpectation{false}, args...) = map(args...)
+
+tmapreduce_or_mapreduce(::DifferentiableExpectation{true}, args...) = tmapreduce(args...)
+tmapreduce_or_mapreduce(::DifferentiableExpectation{false}, args...) = mapreduce(args...)
+
+tmean_or_mean(::DifferentiableExpectation{true}, args...) = tmean(args...)
+tmean_or_mean(::DifferentiableExpectation{false}, args...) = mean(args...)
+
 """
     presamples(F::DifferentiableExpectation, θ...)
 
@@ -62,19 +71,11 @@ function samples_from_presamples(
 ) where {threaded}
     (; f) = F
     fk = FixKwargs(f, kwargs)
-    if threaded
-        return tmap(fk, xs)
-    else
-        return map(fk, xs)
-    end
+    return tmap_or_map(F, fk, xs)
 end
 
 function (F::DifferentiableExpectation{threaded})(θ...; kwargs...) where {threaded}
     ys = samples(F, θ...; kwargs...)
-    y = if threaded
-        tmean(ys)
-    else
-        mean(ys)
-    end
+    y = tmean_or_mean(F, ys)
     return y
 end

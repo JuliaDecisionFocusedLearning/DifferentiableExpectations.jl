@@ -13,7 +13,26 @@ See the book by [blondelElementsDifferentiableProgramming2024](@citet) to know m
 
 Most of the math below is taken from [mohamedMonteCarloGradient2020](@citet).
 
+## Empirical distribution
+
+Implemented by [`FixedAtomsProbabilityDistribution`](@ref).
+
+### Mean
+
+An empirical distribution ``\pi`` is given by a set of atoms ``a_i`` and associated weights ``w_i \geq 0`` such that ``\sum_i w_i = 1``.
+Its expectation is ``\mathbb{E}[\pi] = \sum w_i a_i``.
+The gradient of this expectation with respect to weight ``w_j`` is ``\partial_{w_j} \mathbb{E}[\pi] = a_j``.
+Thus, the vector-Jacobian product is:
+
+```math
+\left(\partial_{w_j} \mathbb{E}[\pi]\right)^\top v = a_j^\top v 
+```
+
+We assume the atoms are kept constant during differentiation.
+
 ## REINFORCE
+
+Implemented by [`Reinforce`](@ref).
 
 ### Principle
 
@@ -62,6 +81,8 @@ This gives the following vector-Jacobian product:
 ```
 
 ## Reparametrization
+
+Implemented by [`Reparametrization`](@ref).
 
 ### Trick
 
