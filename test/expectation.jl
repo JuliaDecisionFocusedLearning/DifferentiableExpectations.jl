@@ -123,4 +123,11 @@ end
     r_split(θ...) = mean(empirical_distribution(r, θ...))
     @test r(μ, σ) == r_split(μ, σ)
     @test gradient(r, μ, σ) == gradient(r_split, μ, σ)
+
+    r = Reinforce(
+        exp, Normal; nb_samples=100, variance_reduction=true, rng=StableRNG(seed), seed=0
+    )
+    r_split(θ...) = mean(empirical_distribution(r, θ...))
+    @test r(μ, σ) == r_split(μ, σ)
+    @test_broken gradient(r, μ, σ) == gradient(r_split, μ, σ)
 end
