@@ -110,6 +110,19 @@ The Monte-Carlo approximation for this is
 
 $$\nabla_\theta q(y | \theta) \simeq \frac{1}{S} \sum_{s=1}^S \mathbf{1} \{f(x_s) = y\} ~ \nabla_\theta \log p(x_s | \theta)$$
 
+In our implementation, we assume that the sampled $y_s$ are pairwise distinct (maybe not necessary?), and that together they form the whole support of the distribution $q$.
+We can thus consider the vector-to-vector mapping
+
+$$q : \theta \longmapsto \begin{pmatrix} q(y_1|\theta) \\ \dots \\ q(y_S | \theta) \end{pmatrix}$$
+
+whose Jacobian is given by
+
+$$\partial_\theta q(\theta) = \frac{1}{S} \begin{pmatrix} \nabla_\theta \log p(x_1 | \theta)^\top \\ \dots \\ \nabla_\theta \log p(x_S | \theta)^\top \end{pmatrix}$$
+
+and whose VJP is given by
+
+$$\partial_\theta q(\theta)^\top \bar{q} = \frac{1}{S} \sum_s \bar{q}_s \nabla_\theta \log p(x_s | \theta)$$
+
 ### Reparametrization probability gradients
 
 To leverage reparametrization, we perform a change of variables:
