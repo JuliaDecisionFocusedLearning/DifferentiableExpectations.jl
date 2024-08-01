@@ -129,5 +129,5 @@ end
     )
     r_split(θ...) = mean(empirical_distribution(r, θ...))
     @test r(μ, σ) == r_split(μ, σ)
-    @test_broken gradient(r, μ, σ) == gradient(r_split, μ, σ)
+    @test all(isapprox.(gradient(r, μ, σ), gradient(r_split, μ, σ); atol=1e-10))
 end
