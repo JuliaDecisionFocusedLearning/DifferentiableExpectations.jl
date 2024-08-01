@@ -17,12 +17,13 @@ rng = StableRNG(63)
 for threaded in (false, true)
     dist = FixedAtomsProbabilityDistribution([2, 3], [0.4, 0.6]; threaded)
 
-    string(dist)
+    abs2_with_kwargs(x; dummy_kw) = abs2(x)
 
     @test length(dist) == 2
 
     @test mean(dist) ≈ 2.6
     @test mean(abs2, dist) ≈ 7.0
+    @test mean(abs2_with_kwargs, dist; dummy_kw=nothing) ≈ 7.0
     @test mean([rand(rng, dist) for _ in 1:(10^5)]) ≈ 2.6 rtol = 0.1
     @test mean(abs2, [rand(rng, dist) for _ in 1:(10^5)]) ≈ 7.0 rtol = 0.1
 
@@ -34,4 +35,8 @@ for threaded in (false, true)
 
     @test last(gradient(mean, abs2, dist)).atoms === nothing
     @test last(gradient(mean, abs2, dist)).weights == [4, 9]
+    @test last(gradient(d -> mean(abs2_with_kwargs, d; dummy_kw=nothing), dist)).atoms ===
+        nothing
+    @test last(gradient(d -> mean(abs2_with_kwargs, d; dummy_kw=nothing), dist)).weights ==
+        [4, 9]
 end

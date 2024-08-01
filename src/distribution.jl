@@ -117,8 +117,9 @@ end
 
 Shortcut for `mean(map(f, dist))`.
 """
-function Statistics.mean(f, dist::FixedAtomsProbabilityDistribution)
-    return mean(map(f, dist))
+function Statistics.mean(f, dist::FixedAtomsProbabilityDistribution; kwargs...)
+    fk = FixKwargs(f, kwargs)
+    return mean(map(fk, dist))
 end
 
 function ChainRulesCore.rrule(::typeof(mean), dist::FixedAtomsProbabilityDistribution)
@@ -134,8 +135,11 @@ function ChainRulesCore.rrule(::typeof(mean), dist::FixedAtomsProbabilityDistrib
     return e, dist_mean_pullback
 end
 
-function ChainRulesCore.rrule(::typeof(mean), f, dist::FixedAtomsProbabilityDistribution)
-    new_dist = map(f, dist)
+function ChainRulesCore.rrule(
+    ::typeof(mean), f, dist::FixedAtomsProbabilityDistribution; kwargs...
+)
+    fk = FixKwargs(f, kwargs)
+    new_dist = map(fk, dist)
     new_atoms = new_dist.atoms
     e = mean(new_dist)
     function dist_fmean_pullback(Δe_thunked)
