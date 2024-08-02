@@ -41,6 +41,6 @@ export Reparametrization
 export FixedAtomsProbabilityDistribution
 export empirical_distribution
 
-@compat public atoms, weights
+@compat public atoms, weights, FixKwargs
 
 end # module DifferentiableExpectations

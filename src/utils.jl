@@ -2,6 +2,8 @@
     FixKwargs(f, kwargs)
 
 Callable struct that fixes the keyword arguments of `f` to `kwargs...`, and only accepts positional arguments.
+
+This is not exported but still part of the public API.
 """
 struct FixKwargs{F,K}
     f::F
