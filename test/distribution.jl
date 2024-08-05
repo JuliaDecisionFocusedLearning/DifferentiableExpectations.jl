@@ -17,8 +17,6 @@ rng = StableRNG(63)
 for threaded in (false, true)
     dist = FixedAtomsProbabilityDistribution([2, 3], [0.4, 0.6]; threaded)
 
-    string(dist)
-
     @test length(dist) == 2
 
     @test mean(dist) ≈ 2.6

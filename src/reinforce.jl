@@ -124,8 +124,12 @@ function ChainRulesCore.rrule(
 end
 
 function ChainRulesCore.rrule(
-    rc::RuleConfig, ::typeof(empirical_distribution), E::Reinforce, θ...; kwargs...
-)
+    rc::RuleConfig,
+    ::typeof(empirical_distribution),
+    E::Reinforce{t,variance_reduction},
+    θ...;
+    kwargs...,
+) where {t,variance_reduction}
     project_θ = ProjectTo(θ)
 
     (; f, nb_samples) = E
@@ -137,12 +141,22 @@ function ChainRulesCore.rrule(
     _dist_logdensity_grad_partial(x) = dist_logdensity_grad(rc, E, x, θ...)
     gs = mymap(is_threaded(E), _dist_logdensity_grad_partial, xs)
 
+    adjusted_nb_samples = nb_samples - (variance_reduction && nb_samples > 1)
+
     function pullback_Reinforce_probadist(Δdist_thunked)
         Δdist = unthunk(Δdist_thunked)
         Δps = Δdist.weights
+        Δps_mean = mean(Δps)
+        Δps_baseline = if (variance_reduction && nb_samples > 1)
+            Δps .- Δps_mean
+        else
+            Δps
+        end
         ΔE = @not_implemented("The fields of the `Reinforce` object are constant.")
         _single_sample_pullback(gᵢ, Δpᵢ) = gᵢ .* Δpᵢ
-        Δθ = mymapreduce(is_threaded(E), _single_sample_pullback, .+, gs, Δps) ./ nb_samples
+        Δθ =
+            mymapreduce(is_threaded(E), _single_sample_pullback, .+, gs, Δps_baseline) ./
+            adjusted_nb_samples
         Δθ_proj = project_θ(Δθ)
         return (NoTangent(), ΔE, Δθ_proj...)
     end

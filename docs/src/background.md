@@ -5,7 +5,7 @@ Most of the math below is taken from [mohamedMonteCarloGradient2020](@citet).
 Consider a function $f: \mathbb{R}^n \to \mathbb{R}^m$, a parameter $\theta \in \mathbb{R}^d$ and a parametric probability distribution $p(\theta)$ on the input space.
 Given a random variable $X \sim p(\theta)$, we want to differentiate the expectation of $Y = f(X)$ with respect to $\theta$:
 
-$$E(\theta) = \mathbb{E}[f(X)] = \int f(x) ~ p(x | \theta) ~\mathrm{d} x$$
+$$E(\theta) = \mathbb{E}[f(X)] = \int f(x) ~ p(x | \theta) ~\mathrm{d} x = \int y ~ q(y | \theta) ~\mathrm{d} y$$
 
 Usually this is approximated with Monte-Carlo sampling: let $x_1, \dots, x_S \sim p(\theta)$ be i.i.d., we have the estimator
 
@@ -15,7 +15,7 @@ $$E(\theta) \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)$$
 
 Since $E$ is a vector-to-vector function, the key quantity we want to compute is its Jacobian matrix $\partial E(\theta) \in \mathbb{R}^{m \times n}$:
 
-$$\partial E(\theta) = \int y ~ \nabla_\theta q(y | \theta)^\top ~ \mathrm{d} y = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~\mathrm{d} x$$
+$$\partial E(\theta) = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~\mathrm{d} x = \int y ~ \nabla_\theta q(y | \theta)^\top ~ \mathrm{d} y$$
 
 However, to implement automatic differentiation, we only need the vector-Jacobian product (VJP) $\partial E(\theta)^\top \bar{y}$ with an output cotangent $\bar{y} \in \mathbb{R}^m$.
 See the book by [blondelElementsDifferentiableProgramming2024](@citet) to know more.
@@ -33,7 +33,7 @@ The REINFORCE estimator is derived with the help of the identity $\nabla \log u 
 $$\begin{aligned}
 \partial E(\theta)
 & = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~ \mathrm{d}x \\
-& = \int f(x) ~ p(x | \theta) \nabla_\theta \log p(x | \theta)^\top ~ \mathrm{d}x \\
+& = \int f(x) ~ \nabla_\theta \log p(x | \theta)^\top p(x | \theta) ~ \mathrm{d}x \\
 & = \mathbb{E} \left[f(X) \nabla_\theta \log p(X | \theta)^\top\right] \\
 \end{aligned}$$
 
@@ -53,7 +53,7 @@ For $S > 1$ Monte-Carlo samples, we have
 
 $$\begin{aligned}
 \partial E(\theta)^\top \bar{y} 
-& \simeq \frac{1}{S} \sum_{s=1}^S \left(f(x_s) - \frac{1}{S - 1}\sum_{j\neq i} f(x_j) \right)^\top \bar{y} ~ \nabla_\theta\log p(x_s | \theta)\\
+& \simeq \frac{1}{S} \sum_{s=1}^S \left(f(x_s) - \frac{1}{S - 1}\sum_{j\neq s} f(x_j) \right)^\top \bar{y} ~ \nabla_\theta\log p(x_s | \theta)\\
 & = \frac{1}{S - 1}\sum_{s=1}^S (f(x_s) - b)^\top \bar{y} ~ \nabla_\theta\log p(x_s | \theta)
 \end{aligned}$$
 
@@ -90,38 +90,55 @@ The following reparametrizations are implemented:
 
 ## Probability gradients
 
-In addition to the expectation, we may also want gradients for individual output densities $q(y | \theta) = \mathbb{P}(f(X) = y)$.
+In the case where $f$ is a function that takes values in a finite set $\mathcal{Y} = \{y_1, \cdots, y_K\}$, we may also want to compute the jacobian of the probability weights vector:
+
+$$q : \theta \longmapsto \begin{pmatrix} q(y_1|\theta) = \mathbb{P}(f(X) = y_1|\theta) \\ \dots \\ q(y_K|\theta) = \mathbb{P}(f(X) = y_K|\theta) \end{pmatrix}$$
+
+whose Jacobian is given by
+
+$$\partial_\theta q(\theta) = \begin{pmatrix} \nabla_\theta q(y_1|\theta)^\top \\ \dots \\ \nabla_\theta q(y_K|\theta)^\top \end{pmatrix}$$
 
 ### REINFORCE probability gradients
 
 The REINFORCE technique can be applied in a similar way:
 
-$$q(y | \theta) = \mathbb{E}[\mathbf{1}\{f(X) = y\}]  = \int \mathbf{1} \{f(x) = y\} ~ p(x | \theta) ~ \mathrm{d}x$$
+$$q(y_k | \theta) = \mathbb{E}[\mathbf{1}\{f(X) = y_k\}]  = \int \mathbf{1} \{f(x) = y_k\} ~ p(x | \theta) ~ \mathrm{d}x$$
 
 Differentiating through the integral,
 
 $$\begin{aligned}
-\nabla_\theta q(y | \theta)
-& = \int \mathbf{1} \{f(x) = y\} ~ \nabla_\theta p(x | \theta) ~ \mathrm{d}x \\
-& = \mathbb{E} [\mathbf{1} \{f(X) = y\} ~ \nabla_\theta \log p(X | \theta)]
+\nabla_\theta q(y_k | \theta)
+& = \int \mathbf{1} \{f(x) = y_k\} ~ \nabla_\theta p(x | \theta) ~ \mathrm{d}x \\
+& = \mathbb{E} [\mathbf{1} \{f(X) = y_k\} ~ \nabla_\theta \log p(X | \theta)]
 \end{aligned}$$
 
 The Monte-Carlo approximation for this is
 
-$$\nabla_\theta q(y | \theta) \simeq \frac{1}{S} \sum_{s=1}^S \mathbf{1} \{f(x_s) = y\} ~ \nabla_\theta \log p(x_s | \theta)$$
+$$\nabla_\theta q(y_k | \theta) \simeq \frac{1}{S} \sum_{s=1}^S \mathbf{1} \{f(x_s) = y_k\} ~ \nabla_\theta \log p(x_s | \theta)$$
 
-In our implementation, we assume that the sampled $y_s$ are pairwise distinct (maybe not necessary?), and that together they form the whole support of the distribution $q$.
-We can thus consider the vector-to-vector mapping
+The VJP is then
 
-$$q : \theta \longmapsto \begin{pmatrix} q(y_1|\theta) \\ \dots \\ q(y_S | \theta) \end{pmatrix}$$
+$$\begin{aligned}
+\partial_\theta q(\theta)^\top \bar{q} &= \sum_{k=1}^K \bar{q}_k \nabla_\theta q(y_k | \theta)\\
+&\simeq  \frac{1}{S} \sum_{s=1}^S \left[\sum_{k=1}^K \bar{q}_k \mathbf{1} \{f(x_s) = y_k\}\right] ~ \nabla_\theta \log p(x_s | \theta)
+\end{aligned}$$
 
-whose Jacobian is given by
+In our implementation, the [`empirical_distribution`](@ref) method outputs an empirical [`FixedAtomsProbabilityDistribution`](@ref) with uniform weights $\frac{1}{S}$, where some $x_s$ can be repeated.
 
-$$\partial_\theta q(\theta) = \frac{1}{S} \begin{pmatrix} \nabla_\theta \log p(x_1 | \theta)^\top \\ \dots \\ \nabla_\theta \log p(x_S | \theta)^\top \end{pmatrix}$$
+$$q : \theta \longmapsto \begin{pmatrix} q(f(x_1)|\theta) \\ \dots \\ q(f(x_S) | \theta) \end{pmatrix}$$
 
-and whose VJP is given by
+We therefore define the corresponding VJP as
 
-$$\partial_\theta q(\theta)^\top \bar{q} = \frac{1}{S} \sum_s \bar{q}_s \nabla_\theta \log p(x_s | \theta)$$
+$$\partial_\theta q(\theta)^\top \bar{q} = \frac{1}{S} \sum_{s=1}^S \bar{q}_s \nabla_\theta \log p(x_s | \theta)$$
+
+If $\bar q$ comes from `mean`, we have $\bar q_s = f(x_s)^\top \bar y$ and we obtain the REINFORCE VJP.
+
+This VJP can be interpreted as an empirical expectation, to which we can also apply variance reduction:
+$$\partial_\theta q(\theta)^\top \bar q \approx \frac{1}{S-1}\sum_s(\bar q_s - b') \nabla_\theta \log p(x_s|\theta)$$
+with $b' = \frac{1}{S}\sum_s \bar q_s$.
+
+Again, if $\bar q$ comes from `mean`, we have $\bar q_s = f(x_s)^\top \bar y$ and $b' = b^\top \bar y$. We then obtain the REINFORCE backward rule with variance reduction:
+$$\partial_\theta q(\theta)^\top \bar q \approx \frac{1}{S-1}\sum_s(f(x_s) - b)^\top \bar y \nabla_\theta \log p(x_s|\theta)$$
 
 ### Reparametrization probability gradients
 
