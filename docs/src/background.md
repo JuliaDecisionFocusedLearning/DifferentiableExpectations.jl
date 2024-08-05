@@ -5,7 +5,7 @@ Most of the math below is taken from [mohamedMonteCarloGradient2020](@citet).
 Consider a function $f: \mathbb{R}^n \to \mathbb{R}^m$, a parameter $\theta \in \mathbb{R}^d$ and a parametric probability distribution $p(\theta)$ on the input space.
 Given a random variable $X \sim p(\theta)$, we want to differentiate the expectation of $Y = f(X)$ with respect to $\theta$:
 
-$$E(\theta) = \mathbb{E}[f(X)] = \int f(x) ~ p(x | \theta) ~\mathrm{d} x$$
+$$E(\theta) = \mathbb{E}[f(X)] = \int f(x) ~ p(x | \theta) ~\mathrm{d} x = \int y ~ q(y | \theta) ~\mathrm{d} y$$
 
 Usually this is approximated with Monte-Carlo sampling: let $x_1, \dots, x_S \sim p(\theta)$ be i.i.d., we have the estimator
 
@@ -15,7 +15,7 @@ $$E(\theta) \simeq \frac{1}{S} \sum_{s=1}^S f(x_s)$$
 
 Since $E$ is a vector-to-vector function, the key quantity we want to compute is its Jacobian matrix $\partial E(\theta) \in \mathbb{R}^{m \times n}$:
 
-$$\partial E(\theta) = \int y ~ \nabla_\theta q(y | \theta)^\top ~ \mathrm{d} y = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~\mathrm{d} x$$
+$$\partial E(\theta) = \int f(x) ~ \nabla_\theta p(x | \theta)^\top ~\mathrm{d} x = \int y ~ \nabla_\theta q(y | \theta)^\top ~ \mathrm{d} y$$
 
 However, to implement automatic differentiation, we only need the vector-Jacobian product (VJP) $\partial E(\theta)^\top \bar{y}$ with an output cotangent $\bar{y} \in \mathbb{R}^m$.
 See the book by [blondelElementsDifferentiableProgramming2024](@citet) to know more.
@@ -123,13 +123,13 @@ $$\begin{aligned}
 &\simeq  \frac{1}{S} \sum_{s=1}^S \left[\sum_{k=1}^K \bar{q}_k \mathbf{1} \{f(x_s) = y_k\}\right] ~ \nabla_\theta \log p(x_s | \theta)
 \end{aligned}$$
 
-In our implementation, the [`empirical_distribution`](@ref) method outputs an empirical [`FixedAtomsProbabilityDistribution`](@ref) whiich uniform weights $\frac{1}{S}$, where some $x_s$ can be repeated.
+In our implementation, the [`empirical_distribution`](@ref) method outputs an empirical [`FixedAtomsProbabilityDistribution`](@ref) with uniform weights $\frac{1}{S}$, where some $x_s$ can be repeated.
 
 $$q : \theta \longmapsto \begin{pmatrix} q(f(x_1)|\theta) \\ \dots \\ q(f(x_S) | \theta) \end{pmatrix}$$
 
 We therefore define the corresponding VJP as
 
-$$\partial_\theta q(\theta)^\top \bar{q} = \frac{1}{S} \sum_s \bar{q}_s \nabla_\theta \log p(x_s | \theta)$$
+$$\partial_\theta q(\theta)^\top \bar{q} = \frac{1}{S} \sum_{s=1}^S \bar{q}_s \nabla_\theta \log p(x_s | \theta)$$
 
 If $\bar q$ comes from `mean`, we have $\bar q_s = f(x_s)^\top \bar y$ and we obtain the REINFORCE VJP.
 
